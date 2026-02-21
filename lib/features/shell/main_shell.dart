@@ -8,7 +8,9 @@ import 'package:iot_aqua_app/ai/ai_insight_page.dart';
 import 'package:iot_aqua_app/analytics/analytics_page.dart';
 import 'package:iot_aqua_app/control/control_page.dart';
 import 'package:iot_aqua_app/dashboard/dashboard_page.dart';
-import 'package:iot_aqua_app/settings/settings_page.dart';
+import 'package:iot_aqua_app/features/settings/settings_page.dart';
+
+
 
 
 

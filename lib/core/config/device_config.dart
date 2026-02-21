@@ -1,0 +1,1 @@
+const String kDeviceId = "esp32_01";

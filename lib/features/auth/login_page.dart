@@ -113,11 +113,11 @@ class _LoginPageState extends State<LoginPage> {
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: Colors.black12),
+                    border: Border.all(color: Color(0xFF2E7D32)),
                   ),
                   child: Column(
                     children: const [
-                      Icon(Icons.eco, size: 56),
+                      Icon(Icons.eco, size: 56,color: Color(0xFF2E7D32)),
                       SizedBox(height: 10),
                       Text(
                         "Smart IoT Aquaponics",
@@ -127,7 +127,7 @@ class _LoginPageState extends State<LoginPage> {
                       Text(
                         "Sign in to monitor and manage your system",
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.black54),
+                        style: TextStyle(color: Color(0xFF2E7D32)),
                       ),
                     ],
                   ),
@@ -140,7 +140,7 @@ class _LoginPageState extends State<LoginPage> {
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: Colors.black12),
+                    border: Border.all(color: const Color(0xFF2E7D32)),
                   ),
                   child: Form(
                     key: _formKey,
@@ -242,7 +242,7 @@ class _LoginPageState extends State<LoginPage> {
                         const Text(
                           "Note: Employees are created by Admin.\nIf you don’t have credentials, contact your admin.",
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.black54, fontSize: 12),
+                          style: TextStyle(color: Color(0xFF2E7D32), fontSize: 12),
                         ),
                       ],
                     ),
@@ -255,7 +255,7 @@ class _LoginPageState extends State<LoginPage> {
                 Text(
                   "Super Admin: ${AuthService.superAdminEmail}",
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.black45, fontSize: 12),
+                  style: const TextStyle(color: Color(0xFF2E7D32), fontSize: 12),
                 ),
 
                 const SizedBox(height: 12),

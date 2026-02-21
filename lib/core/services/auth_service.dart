@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -24,6 +25,61 @@ class AuthService {
     await ensureUserDoc(cred.user);
     return cred;
   }
+    Future<void> createUserWithRole({
+    required String email,
+    required String password,
+    required String name,
+    required String role, // "admin" or "employee"
+  }) async {
+    // Create user in Firebase Auth
+    final cred = await _auth.createUserWithEmailAndPassword(
+      email: email.trim(),
+      password: password.trim(),
+    );
+
+    // Create/merge user document with role
+    await _db.collection("users").doc(cred.user!.uid).set({
+      "uid": cred.user!.uid,
+      "email": email.trim(),
+      "name": name.trim(),
+      "role": role,
+      "createdAt": FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> createUserWithRoleSecondaryApp({
+  required String email,
+  required String password,
+  required String name,
+  required String role,
+}) async {
+  // Create a secondary Firebase app so current super admin stays logged in
+  final secondaryApp = await Firebase.initializeApp(
+    name: "SecondaryApp",
+    options: Firebase.app().options,
+  );
+
+  final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
+
+  final cred = await secondaryAuth.createUserWithEmailAndPassword(
+    email: email.trim(),
+    password: password.trim(),
+  );
+
+  await _db.collection("users").doc(cred.user!.uid).set({
+    "uid": cred.user!.uid,
+    "email": email.trim(),
+    "name": name.trim(),
+    "role": role,
+    "createdAt": FieldValue.serverTimestamp(),
+  }, SetOptions(merge: true));
+
+  // Sign out secondary and delete app instance
+  await secondaryAuth.signOut();
+  await secondaryApp.delete();
+}
+
+
   Future<UserCredential> signInGoogle() async {
     final googleUser = await GoogleSignIn().signIn();
     if (googleUser == null) {
