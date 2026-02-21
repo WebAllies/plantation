@@ -1,0 +1,231 @@
+#include <WiFi.h>
+#include <Firebase_ESP_Client.h>
+
+#include "addons/TokenHelper.h"
+#include "addons/RTDBHelper.h"
+
+// -------------------- WIFI --------------------
+#define WIFI_SSID "YOUR_WIFI_SSID"
+#define WIFI_PASS "YOUR_WIFI_PASSWORD"
+
+// -------------------- FIREBASE --------------------
+#define API_KEY "YOUR_FIREBASE_WEB_API_KEY"
+#define FIREBASE_PROJECT_ID "YOUR_PROJECT_ID"     // e.g. myapp-12345
+#define USER_EMAIL "YOUR_FIREBASE_EMAIL"          // a service account email user you created
+#define USER_PASSWORD "YOUR_FIREBASE_PASSWORD"
+
+// -------------------- DEVICE --------------------
+String deviceId = "esp32_01";
+
+// GPIO pins (adjust)
+const int PUMP_PIN  = 26;  // relay IN
+const int VALVE_PIN = 27;  // relay IN
+
+bool pumpState = false;
+bool valveState = false;
+
+// Firebase objects
+FirebaseData fbdo;
+FirebaseAuth auth;
+FirebaseConfig config;
+
+unsigned long lastStatusMs = 0;
+unsigned long lastCmdPollMs = 0;
+
+String deviceDocPath() {
+  return "devices/" + deviceId;
+}
+String commandsColPath() {
+  return "devices/" + deviceId + "/commands";
+}
+String logsColPath() {
+  return "devices/" + deviceId + "/logs";
+}
+
+void setRelay(int pin, bool on) {
+  // change logic if your relay is active LOW:
+  digitalWrite(pin, on ? HIGH : LOW);
+}
+
+void logEvent(const String &level, const String &event, const String &detail) {
+  FirebaseJson content;
+  content.set("fields/ts/timestampValue", Firebase.getCurrentTime());
+  content.set("fields/level/stringValue", level);
+  content.set("fields/event/stringValue", event);
+  content.set("fields/detail/stringValue", detail);
+  content.set("fields/by/stringValue", "esp32");
+
+  String docName = ""; // auto id
+  Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", logsColPath().c_str(), content.raw());
+}
+
+void updateDeviceStatus(bool online) {
+  FirebaseJson content;
+
+  content.set("fields/name/stringValue", "Greenhouse ESP32");
+  content.set("fields/online/booleanValue", online);
+  content.set("fields/lastSeen/timestampValue", Firebase.getCurrentTime());
+  content.set("fields/rssi/integerValue", String(WiFi.RSSI()));
+  content.set("fields/pumpState/booleanValue", pumpState);
+  content.set("fields/valveState/booleanValue", valveState);
+
+  // update document
+  Firebase.Firestore.patchDocument(
+    &fbdo,
+    FIREBASE_PROJECT_ID,
+    "",
+    deviceDocPath().c_str(),
+    content.raw(),
+    "name,online,lastSeen,rssi,pumpState,valveState"
+  );
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(PUMP_PIN, OUTPUT);
+  pinMode(VALVE_PIN, OUTPUT);
+  setRelay(PUMP_PIN, pumpState);
+  setRelay(VALVE_PIN, valveState);
+
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  Serial.print("WiFi connecting");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi connected");
+
+  config.api_key = API_KEY;
+  auth.user.email = USER_EMAIL;
+  auth.user.password = USER_PASSWORD;
+
+  config.token_status_callback = tokenStatusCallback;
+
+  Firebase.begin(&config, &auth);
+  Firebase.reconnectWiFi(true);
+
+  // Optionally set time for timestamp (uses NTP internally)
+  Firebase.setSystemTime(0);
+
+  // initial status
+  updateDeviceStatus(true);
+  logEvent("info", "device_online", "ESP32 connected and reporting online");
+}
+
+void loop() {
+  if (!Firebase.ready()) {
+    delay(200);
+    return;
+  }
+
+  // 1) Update status heartbeat every 5s
+  if (millis() - lastStatusMs > 5000) {
+    lastStatusMs = millis();
+    updateDeviceStatus(true);
+  }
+
+  // 2) Poll commands every 2s
+  if (millis() - lastCmdPollMs > 2000) {
+    lastCmdPollMs = millis();
+    pollLatestPendingCommand();
+  }
+}
+
+void pollLatestPendingCommand() {
+  // Query: latest command where status == "pending"
+  // Firestore query in this library is limited; easiest approach:
+  // read last N commands, then find first pending.
+
+  String collectionId = commandsColPath();
+  // list documents (latest not guaranteed); small N ok for demo
+  if (Firebase.Firestore.listDocuments(&fbdo, FIREBASE_PROJECT_ID, "", collectionId.c_str(), 10)) {
+    FirebaseJson js;
+    js.setJsonData(fbdo.payload());
+
+    FirebaseJsonData arr;
+    js.get(arr, "documents");
+    if (!arr.success) return;
+
+    // documents is an array; iterate and find status == pending
+    // For simplicity, if multiple, first hit executed.
+    FirebaseJsonArray *docs = arr.to<FirebaseJsonArray>();
+    for (size_t i = 0; i < docs->size(); i++) {
+      FirebaseJsonData docData;
+      docs->get(docData, i);
+      if (!docData.success) continue;
+
+      FirebaseJson docJson;
+      docJson.setJsonData(docData.stringValue);
+
+      // Extract name (document path)
+      FirebaseJsonData nameData;
+      docJson.get(nameData, "name");
+      if (!nameData.success) continue;
+      String fullName = nameData.stringValue; // projects/.../documents/devices/.../commands/{id}
+
+      FirebaseJsonData statusData;
+      docJson.get(statusData, "fields/status/stringValue");
+      if (!statusData.success) continue;
+
+      if (statusData.stringValue == "pending") {
+        // read fields
+        FirebaseJsonData typeData, targetData;
+        docJson.get(typeData, "fields/type/stringValue");
+        docJson.get(targetData, "fields/targetState/booleanValue");
+
+        if (!typeData.success || !targetData.success) return;
+
+        String type = typeData.stringValue;
+        bool targetState = targetData.boolValue;
+
+        executeCommand(fullName, type, targetState);
+        return; // execute only one per poll
+      }
+    }
+  }
+}
+
+void executeCommand(const String &docFullName, const String &type, bool targetState) {
+  // docFullName is full resource; we need document path after ".../documents/"
+  int idx = docFullName.indexOf("/documents/");
+  if (idx < 0) return;
+  String docPath = docFullName.substring(idx + 11); // skip "/documents/"
+
+  Serial.printf("Executing command: %s -> %s\n", type.c_str(), targetState ? "true" : "false");
+
+  bool ok = true;
+  String msg = "OK";
+
+  if (type == "pump") {
+    pumpState = targetState;
+    setRelay(PUMP_PIN, pumpState);
+    logEvent("info", "command_executed", String("Pump set to ") + (pumpState ? "ON" : "OFF"));
+  } else if (type == "valve") {
+    valveState = targetState;
+    setRelay(VALVE_PIN, valveState);
+    logEvent("info", "command_executed", String("Valve set to ") + (valveState ? "OPEN" : "CLOSED"));
+  } else {
+    ok = false;
+    msg = "Unknown command type";
+    logEvent("warn", "command_failed", "Unknown command type: " + type);
+  }
+
+  // Update device doc states
+  updateDeviceStatus(true);
+
+  // Patch command status
+  FirebaseJson patch;
+  patch.set("fields/status/stringValue", ok ? "executed" : "failed");
+  patch.set("fields/message/stringValue", msg);
+  patch.set("fields/executedAt/timestampValue", Firebase.getCurrentTime());
+
+  Firebase.Firestore.patchDocument(
+    &fbdo,
+    FIREBASE_PROJECT_ID,
+    "",
+    docPath.c_str(),
+    patch.raw(),
+    "status,message,executedAt"
+  );
+}
