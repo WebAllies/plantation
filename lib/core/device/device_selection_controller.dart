@@ -18,7 +18,7 @@ class DeviceSummary {
 }
 
 class DeviceSelectionController extends ChangeNotifier {
-  final FirebaseFirestore _db;
+  final FirebaseFirestore? _db;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sub;
 
   List<DeviceSummary> _devices = const [];
@@ -26,13 +26,17 @@ class DeviceSelectionController extends ChangeNotifier {
   bool _loading = true;
   String? _error;
 
-  DeviceSelectionController({FirebaseFirestore? firestore})
-    : _db = firestore ?? FirebaseFirestore.instance {
-    _sub = _db
-        .collection('devices')
-        .orderBy('lastSeen', descending: true)
-        .snapshots()
-        .listen(_onSnapshot, onError: _onError);
+  DeviceSelectionController({
+    FirebaseFirestore? firestore,
+    bool autoListen = true,
+  }) : _db = autoListen ? (firestore ?? FirebaseFirestore.instance) : null {
+    if (autoListen) {
+      _sub = _db!
+          .collection('devices')
+          .orderBy('lastSeen', descending: true)
+          .snapshots()
+          .listen(_onSnapshot, onError: _onError);
+    }
   }
 
   List<DeviceSummary> get devices => _devices;
@@ -89,6 +93,20 @@ class DeviceSelectionController extends ChangeNotifier {
   void _onError(Object error, StackTrace _) {
     _loading = false;
     _error = error.toString();
+    notifyListeners();
+  }
+
+  @visibleForTesting
+  void debugSetState({
+    required bool loading,
+    required String? error,
+    required List<DeviceSummary> devices,
+    required String? selectedDeviceId,
+  }) {
+    _loading = loading;
+    _error = error;
+    _devices = devices;
+    _selectedDeviceId = selectedDeviceId;
     notifyListeners();
   }
 

@@ -96,16 +96,20 @@ class _MqttCredentialBundle {
     }
 
     if (host.isEmpty) {
-      throw StateError('Missing MQTT brokerHost/brokerUrl in credential response');
+      throw StateError(
+        'Missing MQTT brokerHost/brokerUrl in credential response',
+      );
     }
 
     final resolvedPort =
         port ?? (useWebSocket ? (useTls ? 443 : 80) : (useTls ? 8883 : 1883));
 
     final clientId =
-        _asString(json['clientId']) ?? 'app-$fallbackDeviceId-${DateTime.now().millisecondsSinceEpoch}';
+        _asString(json['clientId']) ??
+        'app-$fallbackDeviceId-${DateTime.now().millisecondsSinceEpoch}';
     final username = _asString(json['username']) ?? '';
-    final password = _asString(json['password']) ?? _asString(json['token']) ?? '';
+    final password =
+        _asString(json['password']) ?? _asString(json['token']) ?? '';
 
     if (username.isEmpty || password.isEmpty) {
       throw StateError('Missing MQTT username/password in credential response');
@@ -212,7 +216,8 @@ class MqttTelemetryService {
   int _generation = 0;
   int _retryAttempt = 0;
 
-  Stream<Map<String, dynamic>> get telemetryStream => _telemetryController.stream;
+  Stream<Map<String, dynamic>> get telemetryStream =>
+      _telemetryController.stream;
 
   Stream<MqttLiveStatus> get statusStream => _statusController.stream;
 
@@ -227,7 +232,11 @@ class MqttTelemetryService {
     final normalizedStatusTopic = statusTopic?.trim();
 
     if (normalizedLiveTopic.isEmpty) {
-      throw ArgumentError.value(liveTopic, 'liveTopic', 'Live topic is required');
+      throw ArgumentError.value(
+        liveTopic,
+        'liveTopic',
+        'Live topic is required',
+      );
     }
 
     final sameTarget =
@@ -236,7 +245,8 @@ class MqttTelemetryService {
         _targetStatusTopic == normalizedStatusTopic;
 
     if (sameTarget &&
-        _client?.connectionStatus?.state == mqtt.MqttConnectionState.connected) {
+        _client?.connectionStatus?.state ==
+            mqtt.MqttConnectionState.connected) {
       return;
     }
 
@@ -311,11 +321,10 @@ class MqttTelemetryService {
       client.onConnected = _handleConnected;
       client.pongCallback = _handlePong;
 
-      final connMessage =
-          mqtt.MqttConnectMessage()
-              .withClientIdentifier(credentials.clientId)
-              .startClean()
-              .authenticateAs(credentials.username, credentials.password);
+      final connMessage = mqtt.MqttConnectMessage()
+          .withClientIdentifier(credentials.clientId)
+          .startClean()
+          .authenticateAs(credentials.username, credentials.password);
 
       if ((credentials.statusTopic ?? '').isNotEmpty) {
         final willPayload = jsonEncode(<String, dynamic>{
@@ -347,7 +356,8 @@ class MqttTelemetryService {
         return;
       }
 
-      if (client.connectionStatus?.state != mqtt.MqttConnectionState.connected) {
+      if (client.connectionStatus?.state !=
+          mqtt.MqttConnectionState.connected) {
         throw StateError(
           'Connect failed: ${client.connectionStatus?.state} '
           '(${client.connectionStatus?.returnCode})',
@@ -396,9 +406,7 @@ class MqttTelemetryService {
     }
   }
 
-  void _handleUpdates(
-    List<mqtt.MqttReceivedMessage<mqtt.MqttMessage>> events,
-  ) {
+  void _handleUpdates(List<mqtt.MqttReceivedMessage<mqtt.MqttMessage>> events) {
     for (final event in events) {
       final message = event.payload;
       if (message is! mqtt.MqttPublishMessage) continue;
@@ -417,9 +425,22 @@ class MqttTelemetryService {
       if (decoded is! Map) continue;
 
       try {
-        final mapped = decoded.map<String, dynamic>((dynamic key, dynamic value) {
+        final mapped = decoded.map<String, dynamic>((
+          dynamic key,
+          dynamic value,
+        ) {
           return MapEntry(key.toString(), value);
         });
+
+        final expectedDeviceId = _targetDeviceId;
+        final payloadDeviceId = mapped['deviceId']?.toString().trim();
+        if (expectedDeviceId != null &&
+            payloadDeviceId != null &&
+            payloadDeviceId.isNotEmpty &&
+            payloadDeviceId != expectedDeviceId) {
+          continue;
+        }
+
         _telemetryController.add(mapped);
       } catch (_) {
         continue;
@@ -439,7 +460,8 @@ class MqttTelemetryService {
 
   void _handlePong() {
     if (_disposed) return;
-    if (_client?.connectionStatus?.state == mqtt.MqttConnectionState.connected) {
+    if (_client?.connectionStatus?.state ==
+        mqtt.MqttConnectionState.connected) {
       _emitStatus(MqttLiveState.connected, 'MQTT heartbeat OK');
     }
   }
@@ -510,7 +532,8 @@ class MqttTelemetryService {
     final hasUrl = _fallbackBrokerUrl.trim().isNotEmpty;
     final hasHost = _fallbackBrokerHost.trim().isNotEmpty;
     final hasAuth =
-        _fallbackUsername.trim().isNotEmpty && _fallbackPassword.trim().isNotEmpty;
+        _fallbackUsername.trim().isNotEmpty &&
+        _fallbackPassword.trim().isNotEmpty;
 
     if ((!hasUrl && !hasHost) || !hasAuth) return null;
 

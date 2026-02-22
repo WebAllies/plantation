@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:iot_aqua_app/ai/superadmin_ai_reports_page.dart';
+import 'package:iot_aqua_app/core/device/device_selector_header.dart';
 
 import '../auth/login_page.dart';
 import '../sensors/sensor_settings_page.dart';
@@ -9,8 +10,6 @@ import '../sensors/sensor_settings_page.dart';
 import 'tabs/profile_tab.dart';
 import 'tabs/system_tab.dart';
 import 'tabs/about_tab.dart';
-
-
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -34,7 +33,8 @@ class _SettingsPageState extends State<SettingsPage> {
     return r; // keep custom
   }
 
-  bool get isAdmin => roleNormalized == "admin" || roleNormalized == "super_admin";
+  bool get isAdmin =>
+      roleNormalized == "admin" || roleNormalized == "super_admin";
   bool get isSuperAdmin => roleNormalized == "super_admin";
 
   @override
@@ -44,23 +44,32 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _loadUserInfo() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        if (!mounted) return;
+        setState(() => _loading = false);
+        return;
+      }
 
-    final doc = await FirebaseFirestore.instance
-        .collection("users")
-        .doc(user.uid)
-        .get();
+      final doc = await FirebaseFirestore.instance
+          .collection("users")
+          .doc(user.uid)
+          .get();
 
-    final data = doc.data() ?? {};
+      final data = doc.data() ?? {};
 
-    if (!mounted) return;
-    setState(() {
-      _role = (data["role"] ?? "employee").toString();
-      _name = (data["name"] ?? user.displayName ?? "").toString();
-      _email = (data["email"] ?? user.email ?? "").toString();
-      _loading = false;
-    });
+      if (!mounted) return;
+      setState(() {
+        _role = (data["role"] ?? "employee").toString();
+        _name = (data["name"] ?? user.displayName ?? "").toString();
+        _email = (data["email"] ?? user.email ?? "").toString();
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
   }
 
   Future<void> _logout() async {
@@ -77,9 +86,7 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     // ✅ Dynamic tabs
@@ -87,7 +94,8 @@ class _SettingsPageState extends State<SettingsPage> {
       const Tab(icon: Icon(Icons.person), text: "Profile"),
       const Tab(icon: Icon(Icons.settings), text: "System"),
       if (isAdmin) const Tab(icon: Icon(Icons.sensors), text: "Sensors"),
-      if (isSuperAdmin) const Tab(icon: Icon(Icons.assessment), text: "Reports"),
+      if (isSuperAdmin)
+        const Tab(icon: Icon(Icons.assessment), text: "Reports"),
       const Tab(icon: Icon(Icons.info_outline), text: "About"),
     ];
 
@@ -98,10 +106,7 @@ class _SettingsPageState extends State<SettingsPage> {
         role: roleNormalized, // pass normalized role
         onLogout: _logout,
       ),
-      SystemTab(
-        role: roleNormalized,
-        isSuperAdmin: isSuperAdmin,
-      ),
+      SystemTab(role: roleNormalized, isSuperAdmin: isSuperAdmin),
       if (isAdmin) const SensorSettingsPage(),
 
       // ✅ SuperAdmin only: AI Reports page (filters + PDF/CSV export)
@@ -115,9 +120,17 @@ class _SettingsPageState extends State<SettingsPage> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text("Settings"),
-          bottom: TabBar(
-            tabs: tabs,
-            isScrollable: true,
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(
+              kDeviceSelectorHeaderHeight + kTextTabBarHeight,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const DeviceSelectorHeaderFromProvider(),
+                TabBar(tabs: tabs, isScrollable: true),
+              ],
+            ),
           ),
         ),
         body: TabBarView(children: views),

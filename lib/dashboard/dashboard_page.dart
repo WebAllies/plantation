@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:iot_aqua_app/core/device/device_selector_header.dart';
 import 'package:iot_aqua_app/core/realtime/mqtt_telemetry_service.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -403,9 +404,19 @@ class _DashboardPageState extends State<DashboardPage> {
     required String sourceLabel,
   }) {
     final frame = _TelemetryFrame.fromJson(decoded, fallback: _liveFrame);
+    final selectedDeviceId = widget.selectedDeviceId;
+
+    // Ignore frames that explicitly belong to another device.
+    if (selectedDeviceId != null &&
+        frame.deviceId != 'unknown' &&
+        frame.deviceId != selectedDeviceId) {
+      return;
+    }
 
     final incomingTs = frame.tsMs;
-    if (incomingTs != null && _lastLiveTsMs != null && incomingTs < _lastLiveTsMs!) {
+    if (incomingTs != null &&
+        _lastLiveTsMs != null &&
+        incomingTs < _lastLiveTsMs!) {
       return;
     }
 
@@ -555,7 +566,10 @@ class _DashboardPageState extends State<DashboardPage> {
     final deviceId = widget.selectedDeviceId;
     if (deviceId == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Live Dashboard')),
+        appBar: AppBar(
+          title: const Text('Live Dashboard'),
+          bottom: const DeviceSelectorHeaderBottom(),
+        ),
         body: const Center(
           child: Text(
             'No devices found. Flash an ESP32 with a unique DEVICE_ID and connect it.',
@@ -570,11 +584,16 @@ class _DashboardPageState extends State<DashboardPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Live Dashboard')),
+      appBar: AppBar(
+        title: const Text('Live Dashboard'),
+        bottom: const DeviceSelectorHeaderBottom(),
+      ),
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        key: ValueKey<String>('dashboard-device-$deviceId'),
         stream: ref.snapshots(),
         builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
+          if (snap.connectionState == ConnectionState.waiting &&
+              !snap.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
 
@@ -586,9 +605,12 @@ class _DashboardPageState extends State<DashboardPage> {
           final wsUrl = data['wsUrl']?.toString();
           final mqttTopicLive = data['mqttTopicLive']?.toString();
           final mqttStatusTopic = data['mqttStatusTopic']?.toString();
-          final mqttEnabled = _TelemetryFrame._toBoolValue(data['mqttEnabled']) ?? false;
-          final realtimeTransport =
-              (data['realtimeTransport'] ?? '').toString().toLowerCase().trim();
+          final mqttEnabled =
+              _TelemetryFrame._toBoolValue(data['mqttEnabled']) ?? false;
+          final realtimeTransport = (data['realtimeTransport'] ?? '')
+              .toString()
+              .toLowerCase()
+              .trim();
 
           final prefersMqtt = realtimeTransport == 'mqtt' && mqttEnabled;
           final hasMqttTopic =
@@ -708,7 +730,9 @@ class _DashboardPageState extends State<DashboardPage> {
                       ),
                       Chip(
                         avatar: const Icon(Icons.network_check),
-                        label: Text('RSSI: ${_fmtInt(activeFrame.rssi, 'dBm')}'),
+                        label: Text(
+                          'RSSI: ${_fmtInt(activeFrame.rssi, 'dBm')}',
+                        ),
                       ),
                     ],
                   ),

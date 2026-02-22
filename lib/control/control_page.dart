@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:iot_aqua_app/core/device/device_selector_header.dart';
 
 class ControlPage extends StatefulWidget {
   const ControlPage({super.key, required this.selectedDeviceId});
@@ -79,7 +80,10 @@ class _ControlPageState extends State<ControlPage> {
     final deviceId = widget.selectedDeviceId;
     if (deviceId == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text("Control")),
+        appBar: AppBar(
+          title: const Text("Control"),
+          bottom: const DeviceSelectorHeaderBottom(),
+        ),
         body: const Center(
           child: Text(
             "No devices found. Flash an ESP32 with a unique DEVICE_ID and connect it.",
@@ -93,8 +97,12 @@ class _ControlPageState extends State<ControlPage> {
         .doc(deviceId);
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Control")),
+      appBar: AppBar(
+        title: const Text("Control"),
+        bottom: const DeviceSelectorHeaderBottom(),
+      ),
       body: StreamBuilder<DocumentSnapshot>(
+        key: ValueKey<String>('control-device-$deviceId'),
         stream: devRef.snapshots(),
         builder: (context, snap) {
           if (!snap.hasData) {
