@@ -1,6 +1,8 @@
 #include <WiFi.h>
 #include <Firebase_ESP_Client.h>
 #include <WebSocketsServer.h>
+#include <WiFiClientSecure.h>
+#include <PubSubClient.h>
 #include <math.h>
 #include <time.h>
 
@@ -16,6 +18,13 @@
 #define FIREBASE_PROJECT_ID "iotaquaapp"
 #define USER_EMAIL "device@iot.com"
 #define USER_PASSWORD "device12345"
+
+// -------------------- MQTT --------------------
+// Managed brokers typically use TLS on port 8883 for devices.
+#define MQTT_BROKER_HOST "9b2acde209524e8788afd4921fd6c347.s1.eu.hivemq.cloud"
+#define MQTT_BROKER_PORT 8883
+#define MQTT_USERNAME "plantation_app"
+#define MQTT_PASSWORD "Shuaib123"
 
 // -------------------- DEVICE --------------------
 #define DEVICE_ID "esp32_sim_01"
@@ -33,6 +42,8 @@ float waterLevelPct = 82.0f;
 float tdsPpm = 900.0f;
 
 String wsUrl = "";
+String mqttTopicLive = "";
+String mqttStatusTopic = "";
 
 // Firebase objects
 FirebaseData fbdo;
@@ -40,16 +51,20 @@ FirebaseAuth auth;
 FirebaseConfig config;
 
 WebSocketsServer wsServer(WS_PORT);
+WiFiClientSecure mqttSecureClient;
+PubSubClient mqttClient(mqttSecureClient);
 
 unsigned long lastSimMs = 0;
 unsigned long lastStatusMs = 0;
 unsigned long lastCmdPollMs = 0;
 unsigned long lastHistoryMs = 0;
+unsigned long lastMqttReconnectAttemptMs = 0;
 
 const unsigned long SIM_INTERVAL_MS = 1000;
 const unsigned long STATUS_INTERVAL_MS = 5000;
 const unsigned long CMD_POLL_INTERVAL_MS = 2000;
 const unsigned long HISTORY_INTERVAL_MS = 300000;
+const unsigned long MQTT_RECONNECT_INTERVAL_MS = 5000;
 const char *NTP_SERVER_1 = "pool.ntp.org";
 const char *NTP_SERVER_2 = "time.google.com";
 const char *NTP_SERVER_3 = "time.nist.gov";
@@ -129,10 +144,19 @@ float randomDelta(float magnitude) {
   return (random(-1000, 1001) / 1000.0f) * magnitude;
 }
 
+String epochMillisString() {
+  time_t now = time(nullptr);
+  if (now < 1700000000) {
+    return String((unsigned long)millis());
+  }
+  unsigned long long epochMs = ((unsigned long long)now) * 1000ULL;
+  return String(epochMs);
+}
+
 String buildSnapshotJson() {
   FirebaseJson js;
   js.set("deviceId", deviceId);
-  js.set("tsMs", (int)millis());
+  js.set("tsEpochMs", epochMillisString());
   js.set("temperatureC", roundf(temperatureC * 100.0f) / 100.0f);
   js.set("ph", roundf(ph * 100.0f) / 100.0f);
   js.set("waterLevelPct", roundf(waterLevelPct * 100.0f) / 100.0f);
@@ -144,6 +168,63 @@ String buildSnapshotJson() {
   String out;
   js.toString(out, false);
   return out;
+}
+
+String buildStatusJson(const String &status) {
+  FirebaseJson js;
+  js.set("deviceId", deviceId);
+  js.set("status", status);
+  js.set("tsEpochMs", epochMillisString());
+
+  String out;
+  js.toString(out, false);
+  return out;
+}
+
+bool connectMqtt() {
+  if (mqttClient.connected()) return true;
+
+  if (mqttTopicLive.length() == 0 || mqttStatusTopic.length() == 0) {
+    return false;
+  }
+
+  String clientId = String("esp32sim-") + deviceId + "-" + String(esp_random(), HEX);
+  String willPayload = buildStatusJson("offline");
+  bool ok = mqttClient.connect(
+    clientId.c_str(),
+    MQTT_USERNAME,
+    MQTT_PASSWORD,
+    mqttStatusTopic.c_str(),
+    1,
+    true,
+    willPayload.c_str()
+  );
+
+  if (!ok) {
+    Serial.printf("[MQTT] connect failed (state=%d)\n", mqttClient.state());
+    return false;
+  }
+
+  String onlinePayload = buildStatusJson("online");
+  mqttClient.publish(mqttStatusTopic.c_str(), onlinePayload.c_str(), true);
+  Serial.println("[MQTT] connected");
+  return true;
+}
+
+void ensureMqttConnected() {
+  if (mqttClient.connected()) return;
+  if (millis() - lastMqttReconnectAttemptMs < MQTT_RECONNECT_INTERVAL_MS) return;
+
+  lastMqttReconnectAttemptMs = millis();
+  connectMqtt();
+}
+
+void publishMqttSnapshot() {
+  if (!mqttClient.connected()) return;
+  if (mqttTopicLive.length() == 0) return;
+
+  String payload = buildSnapshotJson();
+  mqttClient.publish(mqttTopicLive.c_str(), payload.c_str(), false);
 }
 
 void logEvent(const String &level, const String &event, const String &detail) {
@@ -177,6 +258,10 @@ void updateDeviceStatus(bool online) {
   content.set("fields/waterLevelPct/doubleValue", waterLevelPct);
   content.set("fields/tdsPpm/doubleValue", tdsPpm);
   content.set("fields/wsUrl/stringValue", wsUrl);
+  content.set("fields/realtimeTransport/stringValue", "mqtt");
+  content.set("fields/mqttTopicLive/stringValue", mqttTopicLive);
+  content.set("fields/mqttStatusTopic/stringValue", mqttStatusTopic);
+  content.set("fields/mqttEnabled/booleanValue", true);
   content.set("fields/simulator/booleanValue", true);
 
   bool patchOk = Firebase.Firestore.patchDocument(
@@ -185,7 +270,7 @@ void updateDeviceStatus(bool online) {
     "",
     deviceDocPath().c_str(),
     content.raw(),
-    "name,online,lastSeen,rssi,pumpState,valveState,temperatureC,ph,waterLevelPct,tdsPpm,wsUrl,simulator"
+    "name,online,lastSeen,rssi,pumpState,valveState,temperatureC,ph,waterLevelPct,tdsPpm,wsUrl,realtimeTransport,mqttTopicLive,mqttStatusTopic,mqttEnabled,simulator"
   );
   printFirestoreResult("updateDeviceStatus", patchOk);
 }
@@ -224,6 +309,10 @@ bool ensureDeviceDocument() {
   content.set("fields/waterLevelPct/doubleValue", waterLevelPct);
   content.set("fields/tdsPpm/doubleValue", tdsPpm);
   content.set("fields/wsUrl/stringValue", wsUrl);
+  content.set("fields/realtimeTransport/stringValue", "mqtt");
+  content.set("fields/mqttTopicLive/stringValue", mqttTopicLive);
+  content.set("fields/mqttStatusTopic/stringValue", mqttStatusTopic);
+  content.set("fields/mqttEnabled/booleanValue", true);
   content.set("fields/simulator/booleanValue", true);
   if (!setTimestampField(content, "fields/createdAt/timestampValue")) return false;
 
@@ -316,6 +405,7 @@ void executeCommand(const String &docFullName, const String &type, bool targetSt
 
   updateDeviceStatus(true);
   broadcastSnapshot();
+  publishMqttSnapshot();
 
   FirebaseJson patch;
   patch.set("fields/status/stringValue", ok ? "executed" : "failed");
@@ -416,11 +506,21 @@ void setup() {
   }
   Serial.println("\nWiFi connected");
 
+  mqttTopicLive = "plantation/" + String(deviceId) + "/telemetry/live";
+  mqttStatusTopic = "plantation/" + String(deviceId) + "/status";
   wsUrl = "ws://" + WiFi.localIP().toString() + ":" + String(WS_PORT);
   Serial.println("WebSocket endpoint: " + wsUrl);
+  Serial.println("MQTT live topic: " + mqttTopicLive);
+  Serial.println("MQTT status topic: " + mqttStatusTopic);
 
   wsServer.begin();
   wsServer.onEvent(onWsEvent);
+
+  mqttSecureClient.setInsecure();
+  mqttClient.setServer(MQTT_BROKER_HOST, MQTT_BROKER_PORT);
+  mqttClient.setKeepAlive(20);
+  mqttClient.setBufferSize(1024);
+  connectMqtt();
 
   config.api_key = API_KEY;
   auth.user.email = USER_EMAIL;
@@ -455,11 +555,14 @@ void setup() {
 
 void loop() {
   wsServer.loop();
+  ensureMqttConnected();
+  mqttClient.loop();
 
   if (millis() - lastSimMs >= SIM_INTERVAL_MS) {
     lastSimMs = millis();
     simulateSensors();
     broadcastSnapshot();
+    publishMqttSnapshot();
   }
 
   if (!Firebase.ready()) {

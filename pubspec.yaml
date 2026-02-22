@@ -50,6 +50,8 @@ dependencies:
   path_provider: ^2.1.4
   image_picker: ^1.0.7
   csv: ^6.0.0
+  cloud_functions: ^4.7.6
+  mqtt_client: ^10.11.1
   web_socket_channel: ^3.0.1
 
 dev_dependencies:
