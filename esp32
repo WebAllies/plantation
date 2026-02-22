@@ -1,5 +1,7 @@
 #include <WiFi.h>
 #include <Firebase_ESP_Client.h>
+#include <WiFiClientSecure.h>
+#include <PubSubClient.h>
 #include <time.h>
 
 #include "addons/TokenHelper.h"
@@ -15,6 +17,13 @@
 #define USER_EMAIL "YOUR_FIREBASE_EMAIL"          // a service account email user you created
 #define USER_PASSWORD "YOUR_FIREBASE_PASSWORD"
 
+// -------------------- MQTT --------------------
+// Managed brokers typically use TLS on port 8883 for devices.
+#define MQTT_BROKER_HOST "YOUR_MQTT_BROKER_HOST"
+#define MQTT_BROKER_PORT 8883
+#define MQTT_USERNAME "YOUR_MQTT_USERNAME"
+#define MQTT_PASSWORD "YOUR_MQTT_PASSWORD"
+
 // -------------------- DEVICE --------------------
 #define DEVICE_ID "esp32_01"
 const char *deviceId = DEVICE_ID;
@@ -25,17 +34,25 @@ const int VALVE_PIN = 27;  // relay IN
 
 bool pumpState = false;
 bool valveState = false;
+String mqttTopicLive = "";
+String mqttStatusTopic = "";
 
 // Firebase objects
 FirebaseData fbdo;
 FirebaseAuth auth;
 FirebaseConfig config;
+WiFiClientSecure mqttSecureClient;
+PubSubClient mqttClient(mqttSecureClient);
 
 unsigned long lastStatusMs = 0;
 unsigned long lastCmdPollMs = 0;
+unsigned long lastLivePublishMs = 0;
+unsigned long lastMqttReconnectAttemptMs = 0;
 const char *NTP_SERVER_1 = "pool.ntp.org";
 const char *NTP_SERVER_2 = "time.google.com";
 const char *NTP_SERVER_3 = "time.nist.gov";
+const unsigned long LIVE_PUBLISH_INTERVAL_MS = 1000;
+const unsigned long MQTT_RECONNECT_INTERVAL_MS = 5000;
 
 String deviceDocPath() {
   return String("devices/") + deviceId;
@@ -100,6 +117,78 @@ void setRelay(int pin, bool on) {
   digitalWrite(pin, on ? HIGH : LOW);
 }
 
+String epochMillisString() {
+  time_t now = time(nullptr);
+  if (now < 1700000000) {
+    return String((unsigned long)millis());
+  }
+  unsigned long long epochMs = ((unsigned long long)now) * 1000ULL;
+  return String(epochMs);
+}
+
+String buildSnapshotJson() {
+  FirebaseJson js;
+  js.set("deviceId", deviceId);
+  js.set("tsEpochMs", epochMillisString());
+  js.set("pumpState", pumpState);
+  js.set("valveState", valveState);
+  js.set("rssi", WiFi.RSSI());
+
+  String out;
+  js.toString(out, false);
+  return out;
+}
+
+String buildStatusJson(const String &status) {
+  FirebaseJson js;
+  js.set("deviceId", deviceId);
+  js.set("status", status);
+  js.set("tsEpochMs", epochMillisString());
+
+  String out;
+  js.toString(out, false);
+  return out;
+}
+
+bool connectMqtt() {
+  if (mqttClient.connected()) return true;
+  if (mqttTopicLive.length() == 0 || mqttStatusTopic.length() == 0) return false;
+
+  String clientId = String("esp32-") + deviceId + "-" + String(esp_random(), HEX);
+  String willPayload = buildStatusJson("offline");
+  bool ok = mqttClient.connect(
+    clientId.c_str(),
+    MQTT_USERNAME,
+    MQTT_PASSWORD,
+    mqttStatusTopic.c_str(),
+    1,
+    true,
+    willPayload.c_str()
+  );
+  if (!ok) {
+    Serial.printf("[MQTT] connect failed (state=%d)\n", mqttClient.state());
+    return false;
+  }
+
+  String onlinePayload = buildStatusJson("online");
+  mqttClient.publish(mqttStatusTopic.c_str(), onlinePayload.c_str(), true);
+  Serial.println("[MQTT] connected");
+  return true;
+}
+
+void ensureMqttConnected() {
+  if (mqttClient.connected()) return;
+  if (millis() - lastMqttReconnectAttemptMs < MQTT_RECONNECT_INTERVAL_MS) return;
+  lastMqttReconnectAttemptMs = millis();
+  connectMqtt();
+}
+
+void publishMqttSnapshot() {
+  if (!mqttClient.connected() || mqttTopicLive.length() == 0) return;
+  String payload = buildSnapshotJson();
+  mqttClient.publish(mqttTopicLive.c_str(), payload.c_str(), false);
+}
+
 void logEvent(const String &level, const String &event, const String &detail) {
   FirebaseJson content;
   if (!setTimestampField(content, "fields/ts/timestampValue")) return;
@@ -127,6 +216,10 @@ void updateDeviceStatus(bool online) {
   content.set("fields/rssi/integerValue", String(WiFi.RSSI()));
   content.set("fields/pumpState/booleanValue", pumpState);
   content.set("fields/valveState/booleanValue", valveState);
+  content.set("fields/realtimeTransport/stringValue", "mqtt");
+  content.set("fields/mqttTopicLive/stringValue", mqttTopicLive);
+  content.set("fields/mqttStatusTopic/stringValue", mqttStatusTopic);
+  content.set("fields/mqttEnabled/booleanValue", true);
 
   // update document
   bool ok = Firebase.Firestore.patchDocument(
@@ -135,7 +228,7 @@ void updateDeviceStatus(bool online) {
     "",
     deviceDocPath().c_str(),
     content.raw(),
-    "name,online,lastSeen,rssi,pumpState,valveState"
+    "name,online,lastSeen,rssi,pumpState,valveState,realtimeTransport,mqttTopicLive,mqttStatusTopic,mqttEnabled"
   );
   printFirestoreResult("updateDeviceStatus", ok);
 }
@@ -148,6 +241,10 @@ bool ensureDeviceDocument() {
   content.set("fields/rssi/integerValue", String(WiFi.RSSI()));
   content.set("fields/pumpState/booleanValue", pumpState);
   content.set("fields/valveState/booleanValue", valveState);
+  content.set("fields/realtimeTransport/stringValue", "mqtt");
+  content.set("fields/mqttTopicLive/stringValue", mqttTopicLive);
+  content.set("fields/mqttStatusTopic/stringValue", mqttStatusTopic);
+  content.set("fields/mqttEnabled/booleanValue", true);
   content.set("fields/simulator/booleanValue", false);
   if (!setTimestampField(content, "fields/createdAt/timestampValue")) return false;
 
@@ -193,6 +290,17 @@ void setup() {
   }
   Serial.println("\nWiFi connected");
 
+  mqttTopicLive = "plantation/" + String(deviceId) + "/telemetry/live";
+  mqttStatusTopic = "plantation/" + String(deviceId) + "/status";
+  Serial.println("MQTT live topic: " + mqttTopicLive);
+  Serial.println("MQTT status topic: " + mqttStatusTopic);
+
+  mqttSecureClient.setInsecure();
+  mqttClient.setServer(MQTT_BROKER_HOST, MQTT_BROKER_PORT);
+  mqttClient.setKeepAlive(20);
+  mqttClient.setBufferSize(1024);
+  connectMqtt();
+
   config.api_key = API_KEY;
   auth.user.email = USER_EMAIL;
   auth.user.password = USER_PASSWORD;
@@ -222,13 +330,23 @@ void setup() {
   ensureDeviceDocument();
   // initial status
   updateDeviceStatus(true);
+  publishMqttSnapshot();
   logEvent("info", "device_online", "ESP32 connected and reporting online");
 }
 
 void loop() {
+  ensureMqttConnected();
+  mqttClient.loop();
+
   if (!Firebase.ready()) {
     delay(200);
     return;
+  }
+
+  // 0) Publish live telemetry every 1s
+  if (millis() - lastLivePublishMs > LIVE_PUBLISH_INTERVAL_MS) {
+    lastLivePublishMs = millis();
+    publishMqttSnapshot();
   }
 
   // 1) Update status heartbeat every 5s
@@ -339,6 +457,7 @@ void executeCommand(const String &docFullName, const String &type, bool targetSt
 
   // Update device doc states
   updateDeviceStatus(true);
+  publishMqttSnapshot();
 
   // Patch command status
   FirebaseJson patch;
