@@ -1,0 +1,72 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isDeviceAccount() {
+      return isSignedIn()
+             && (
+               request.auth.token.email == "device@iot.com"
+               || request.auth.uid == "o1vjb9RhhlOf95xrAOSlbobVMik2"
+             );
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function userRole() {
+      return isSignedIn() && userDoc().exists() ? userDoc().data.role : null;
+    }
+
+    function isAdminOrSuperAdmin() {
+      return userRole() in ["admin", "super_admin"];
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdminOrSuperAdmin();
+      allow create: if isOwner(uid) || isAdminOrSuperAdmin();
+      allow update: if isAdminOrSuperAdmin()
+                    || (isOwner(uid)
+                        && request.resource.data.role == resource.data.role);
+      allow delete: if isAdminOrSuperAdmin();
+    }
+
+    match /ai_scans/{scanId} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn()
+                  && (resource.data.userId == request.auth.uid
+                      || isAdminOrSuperAdmin());
+      allow update, delete: if false;
+    }
+
+    match /devices/{deviceId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isDeviceAccount() || isAdminOrSuperAdmin();
+
+      match /commands/{commandId} {
+        allow read: if isSignedIn();
+        allow create: if isAdminOrSuperAdmin();
+        allow update: if isDeviceAccount() || isAdminOrSuperAdmin();
+        allow delete: if isAdminOrSuperAdmin();
+      }
+
+      match /logs/{logId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isDeviceAccount() || isAdminOrSuperAdmin();
+      }
+
+      match /readings/{readingId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isDeviceAccount() || isAdminOrSuperAdmin();
+      }
+    }
+  }
+}

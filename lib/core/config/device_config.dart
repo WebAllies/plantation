@@ -1,1 +1,1 @@
-const String kDeviceId = "esp32_01";
+const String kDeviceId = "esp32_sim_01";

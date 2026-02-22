@@ -1,1 +1,28 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"iotaquaapp","appId":"1:810819815260:android:10a3cf866a30ede16ea399","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"iotaquaapp","configurations":{"android":"1:810819815260:android:10a3cf866a30ede16ea399","ios":"1:810819815260:ios:8d67bcda67ea4fac6ea399","macos":"1:810819815260:ios:8d67bcda67ea4fac6ea399","web":"1:810819815260:web:e5d28b944f63dfdd6ea399","windows":"1:810819815260:web:0f2f38876fd0a06d6ea399"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "iotaquaapp",
+          "appId": "1:810819815260:android:10a3cf866a30ede16ea399",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "iotaquaapp",
+          "configurations": {
+            "android": "1:810819815260:android:10a3cf866a30ede16ea399",
+            "ios": "1:810819815260:ios:8d67bcda67ea4fac6ea399",
+            "macos": "1:810819815260:ios:8d67bcda67ea4fac6ea399",
+            "web": "1:810819815260:web:e5d28b944f63dfdd6ea399",
+            "windows": "1:810819815260:web:0f2f38876fd0a06d6ea399"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  }
+}

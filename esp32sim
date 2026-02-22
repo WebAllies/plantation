@@ -1,0 +1,484 @@
+#include <WiFi.h>
+#include <Firebase_ESP_Client.h>
+#include <WebSocketsServer.h>
+#include <math.h>
+#include <time.h>
+
+#include "addons/TokenHelper.h"
+#include "addons/RTDBHelper.h"
+
+// -------------------- WIFI --------------------
+#define WIFI_SSID "Seif_2.4GHz"
+#define WIFI_PASS "Repiphany2"
+
+// -------------------- FIREBASE --------------------
+#define API_KEY "AIzaSyCKU-jSEXoftXGq9653hJql7YWXG7_Rtr8"
+#define FIREBASE_PROJECT_ID "iotaquaapp"
+#define USER_EMAIL "device@iot.com"
+#define USER_PASSWORD "device12345"
+
+// -------------------- DEVICE --------------------
+#define DEVICE_ID "esp32_sim_01"
+const char *deviceId = DEVICE_ID;
+const uint16_t WS_PORT = 81;
+
+// Simulated actuator states
+bool pumpState = false;
+bool valveState = false;
+
+// Simulated sensor values
+float temperatureC = 24.5f;
+float ph = 6.8f;
+float waterLevelPct = 82.0f;
+float tdsPpm = 900.0f;
+
+String wsUrl = "";
+
+// Firebase objects
+FirebaseData fbdo;
+FirebaseAuth auth;
+FirebaseConfig config;
+
+WebSocketsServer wsServer(WS_PORT);
+
+unsigned long lastSimMs = 0;
+unsigned long lastStatusMs = 0;
+unsigned long lastCmdPollMs = 0;
+unsigned long lastHistoryMs = 0;
+
+const unsigned long SIM_INTERVAL_MS = 1000;
+const unsigned long STATUS_INTERVAL_MS = 5000;
+const unsigned long CMD_POLL_INTERVAL_MS = 2000;
+const unsigned long HISTORY_INTERVAL_MS = 300000;
+const char *NTP_SERVER_1 = "pool.ntp.org";
+const char *NTP_SERVER_2 = "time.google.com";
+const char *NTP_SERVER_3 = "time.nist.gov";
+
+String deviceDocPath() {
+  return String("devices/") + deviceId;
+}
+
+String commandsColPath() {
+  return String("devices/") + deviceId + "/commands";
+}
+
+String logsColPath() {
+  return String("devices/") + deviceId + "/logs";
+}
+
+String readingsColPath() {
+  return String("devices/") + deviceId + "/readings";
+}
+
+bool hasValidUtcTime() {
+  return time(nullptr) >= 1700000000;
+}
+
+String firestoreTimestampNow() {
+  time_t now = time(nullptr);
+  if (now < 1700000000) return "";
+
+  struct tm utcTm;
+  gmtime_r(&now, &utcTm);
+
+  char ts[25];
+  strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%SZ", &utcTm);
+  return String(ts);
+}
+
+bool setTimestampField(FirebaseJson &content, const String &path) {
+  String ts = firestoreTimestampNow();
+  if (ts.length() == 0) {
+    Serial.println("[Firestore] skip write: UTC time not synchronized yet");
+    return false;
+  }
+  content.set(path.c_str(), ts);
+  return true;
+}
+
+bool waitForValidUtcTime(unsigned long timeoutMs) {
+  unsigned long start = millis();
+  while (!hasValidUtcTime() && millis() - start < timeoutMs) {
+    delay(200);
+    Serial.print(".");
+  }
+  return hasValidUtcTime();
+}
+
+bool syncUtcTimeViaNtp(unsigned long timeoutMs) {
+  configTime(0, 0, NTP_SERVER_1, NTP_SERVER_2, NTP_SERVER_3);
+  return waitForValidUtcTime(timeoutMs);
+}
+
+void printFirestoreResult(const String &operation, bool ok) {
+  if (ok) {
+    Serial.println("[Firestore] " + operation + " OK");
+    return;
+  }
+  Serial.println("[Firestore] " + operation + " FAIL: " + fbdo.errorReason());
+}
+
+float clampFloat(float value, float minValue, float maxValue) {
+  if (value < minValue) return minValue;
+  if (value > maxValue) return maxValue;
+  return value;
+}
+
+float randomDelta(float magnitude) {
+  // random(-1000, 1001) -> [-1000, 1000]
+  return (random(-1000, 1001) / 1000.0f) * magnitude;
+}
+
+String buildSnapshotJson() {
+  FirebaseJson js;
+  js.set("deviceId", deviceId);
+  js.set("tsMs", (int)millis());
+  js.set("temperatureC", roundf(temperatureC * 100.0f) / 100.0f);
+  js.set("ph", roundf(ph * 100.0f) / 100.0f);
+  js.set("waterLevelPct", roundf(waterLevelPct * 100.0f) / 100.0f);
+  js.set("tdsPpm", roundf(tdsPpm * 100.0f) / 100.0f);
+  js.set("pumpState", pumpState);
+  js.set("valveState", valveState);
+  js.set("rssi", WiFi.RSSI());
+
+  String out;
+  js.toString(out, false);
+  return out;
+}
+
+void logEvent(const String &level, const String &event, const String &detail) {
+  FirebaseJson content;
+  if (!setTimestampField(content, "fields/ts/timestampValue")) return;
+  content.set("fields/level/stringValue", level);
+  content.set("fields/event/stringValue", event);
+  content.set("fields/detail/stringValue", detail);
+  content.set("fields/by/stringValue", "esp32sim");
+
+  bool ok = Firebase.Firestore.createDocument(
+    &fbdo,
+    FIREBASE_PROJECT_ID,
+    "",
+    logsColPath().c_str(),
+    content.raw()
+  );
+  printFirestoreResult("logEvent", ok);
+}
+
+void updateDeviceStatus(bool online) {
+  FirebaseJson content;
+  content.set("fields/name/stringValue", "Greenhouse ESP32 Simulator");
+  content.set("fields/online/booleanValue", online);
+  if (!setTimestampField(content, "fields/lastSeen/timestampValue")) return;
+  content.set("fields/rssi/integerValue", String(WiFi.RSSI()));
+  content.set("fields/pumpState/booleanValue", pumpState);
+  content.set("fields/valveState/booleanValue", valveState);
+  content.set("fields/temperatureC/doubleValue", temperatureC);
+  content.set("fields/ph/doubleValue", ph);
+  content.set("fields/waterLevelPct/doubleValue", waterLevelPct);
+  content.set("fields/tdsPpm/doubleValue", tdsPpm);
+  content.set("fields/wsUrl/stringValue", wsUrl);
+  content.set("fields/simulator/booleanValue", true);
+
+  bool patchOk = Firebase.Firestore.patchDocument(
+    &fbdo,
+    FIREBASE_PROJECT_ID,
+    "",
+    deviceDocPath().c_str(),
+    content.raw(),
+    "name,online,lastSeen,rssi,pumpState,valveState,temperatureC,ph,waterLevelPct,tdsPpm,wsUrl,simulator"
+  );
+  printFirestoreResult("updateDeviceStatus", patchOk);
+}
+
+void writeReadingSnapshot() {
+  FirebaseJson content;
+  if (!setTimestampField(content, "fields/ts/timestampValue")) return;
+  content.set("fields/temperatureC/doubleValue", temperatureC);
+  content.set("fields/ph/doubleValue", ph);
+  content.set("fields/waterLevelPct/doubleValue", waterLevelPct);
+  content.set("fields/tdsPpm/doubleValue", tdsPpm);
+  content.set("fields/pumpState/booleanValue", pumpState);
+  content.set("fields/valveState/booleanValue", valveState);
+  content.set("fields/rssi/integerValue", String(WiFi.RSSI()));
+
+  bool ok = Firebase.Firestore.createDocument(
+    &fbdo,
+    FIREBASE_PROJECT_ID,
+    "",
+    readingsColPath().c_str(),
+    content.raw()
+  );
+  printFirestoreResult("writeReadingSnapshot", ok);
+}
+
+bool ensureDeviceDocument() {
+  FirebaseJson content;
+  content.set("fields/name/stringValue", "Greenhouse ESP32 Simulator");
+  content.set("fields/online/booleanValue", true);
+  if (!setTimestampField(content, "fields/lastSeen/timestampValue")) return false;
+  content.set("fields/rssi/integerValue", String(WiFi.RSSI()));
+  content.set("fields/pumpState/booleanValue", pumpState);
+  content.set("fields/valveState/booleanValue", valveState);
+  content.set("fields/temperatureC/doubleValue", temperatureC);
+  content.set("fields/ph/doubleValue", ph);
+  content.set("fields/waterLevelPct/doubleValue", waterLevelPct);
+  content.set("fields/tdsPpm/doubleValue", tdsPpm);
+  content.set("fields/wsUrl/stringValue", wsUrl);
+  content.set("fields/simulator/booleanValue", true);
+  if (!setTimestampField(content, "fields/createdAt/timestampValue")) return false;
+
+  bool created = Firebase.Firestore.createDocument(
+    &fbdo,
+    FIREBASE_PROJECT_ID,
+    "",
+    "devices",
+    deviceId,
+    content.raw(),
+    ""
+  );
+  if (created) {
+    printFirestoreResult("ensureDeviceDocument create", true);
+    return true;
+  }
+
+  String reason = fbdo.errorReason();
+  if (reason.indexOf("ALREADY_EXISTS") >= 0 ||
+      reason.indexOf("already exists") >= 0 ||
+      reason.indexOf("409") >= 0) {
+    Serial.println("[Firestore] ensureDeviceDocument: existing document found");
+    return true;
+  }
+
+  printFirestoreResult("ensureDeviceDocument create", false);
+  return false;
+}
+
+void simulateSensors() {
+  const float t = millis() / 1000.0f;
+
+  temperatureC += randomDelta(0.20f) + 0.03f * sinf(t / 30.0f);
+  ph += randomDelta(0.05f) + 0.01f * sinf(t / 45.0f);
+
+  float waterDrift = randomDelta(0.50f) - 0.02f;
+  if (pumpState) waterDrift -= 0.08f;
+  if (valveState) waterDrift += 0.10f;
+  waterLevelPct += waterDrift;
+
+  float tdsDrift = randomDelta(5.0f);
+  if (pumpState) tdsDrift += 1.5f;
+  if (valveState) tdsDrift -= 1.2f;
+  tdsPpm += tdsDrift;
+
+  temperatureC = clampFloat(temperatureC, 20.0f, 32.0f);
+  ph = clampFloat(ph, 6.0f, 8.0f);
+  waterLevelPct = clampFloat(waterLevelPct, 30.0f, 100.0f);
+  tdsPpm = clampFloat(tdsPpm, 600.0f, 1400.0f);
+}
+
+void broadcastSnapshot() {
+  String payload = buildSnapshotJson();
+  wsServer.broadcastTXT(payload);
+}
+
+void executeCommand(const String &docFullName, const String &type, bool targetState) {
+  int idx = docFullName.indexOf("/documents/");
+  if (idx < 0) return;
+  String docPath = docFullName.substring(idx + 11);
+
+  Serial.printf(
+    "Executing simulator command: %s -> %s\n",
+    type.c_str(),
+    targetState ? "true" : "false"
+  );
+
+  bool ok = true;
+  String msg = "OK";
+
+  if (type == "pump") {
+    pumpState = targetState;
+    logEvent(
+      "info",
+      "command_executed",
+      String("Pump set to ") + (pumpState ? "ON" : "OFF")
+    );
+  } else if (type == "valve") {
+    valveState = targetState;
+    logEvent(
+      "info",
+      "command_executed",
+      String("Valve set to ") + (valveState ? "OPEN" : "CLOSED")
+    );
+  } else {
+    ok = false;
+    msg = "Unknown command type";
+    logEvent("warn", "command_failed", "Unknown command type: " + type);
+  }
+
+  updateDeviceStatus(true);
+  broadcastSnapshot();
+
+  FirebaseJson patch;
+  patch.set("fields/status/stringValue", ok ? "executed" : "failed");
+  patch.set("fields/message/stringValue", msg);
+  String updateMask = "status,message";
+  if (setTimestampField(patch, "fields/executedAt/timestampValue")) {
+    updateMask = "status,message,executedAt";
+  }
+
+  bool patchOk = Firebase.Firestore.patchDocument(
+    &fbdo,
+    FIREBASE_PROJECT_ID,
+    "",
+    docPath.c_str(),
+    patch.raw(),
+    updateMask.c_str()
+  );
+  printFirestoreResult("executeCommand patch", patchOk);
+}
+
+void pollLatestPendingCommand() {
+  String collectionId = commandsColPath();
+
+  bool ok = Firebase.Firestore.listDocuments(
+        &fbdo,
+        FIREBASE_PROJECT_ID,
+        "",
+        collectionId.c_str(),
+        10,
+        "",
+        "",
+        "",
+        false);
+  if (!ok) {
+    printFirestoreResult("pollLatestPendingCommand listDocuments", false);
+    return;
+  }
+  printFirestoreResult("pollLatestPendingCommand listDocuments", true);
+  FirebaseJson js;
+  js.setJsonData(fbdo.payload());
+
+  FirebaseJsonData arr;
+  js.get(arr, "documents");
+  if (!arr.success) return;
+
+  FirebaseJsonArray docs;
+  docs.setJsonArrayData(arr.stringValue);
+  for (size_t i = 0; i < docs.size(); i++) {
+    FirebaseJsonData docData;
+    docs.get(docData, i);
+    if (!docData.success) continue;
+
+    FirebaseJson docJson;
+    docJson.setJsonData(docData.stringValue);
+
+    FirebaseJsonData nameData;
+    docJson.get(nameData, "name");
+    if (!nameData.success) continue;
+
+    FirebaseJsonData statusData;
+    docJson.get(statusData, "fields/status/stringValue");
+    if (!statusData.success) continue;
+
+    if (statusData.stringValue == "pending") {
+      FirebaseJsonData typeData;
+      FirebaseJsonData targetData;
+      docJson.get(typeData, "fields/type/stringValue");
+      docJson.get(targetData, "fields/targetState/booleanValue");
+
+      if (!typeData.success || !targetData.success) return;
+
+      executeCommand(nameData.stringValue, typeData.stringValue, targetData.boolValue);
+      return;
+    }
+  }
+}
+
+void onWsEvent(uint8_t clientNum, WStype_t type, uint8_t *payload, size_t length) {
+  (void) payload;
+  (void) length;
+
+  if (type == WStype_CONNECTED) {
+    String payloadStr = buildSnapshotJson();
+    wsServer.sendTXT(clientNum, payloadStr);
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  randomSeed(esp_random());
+
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  Serial.print("WiFi connecting");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi connected");
+
+  wsUrl = "ws://" + WiFi.localIP().toString() + ":" + String(WS_PORT);
+  Serial.println("WebSocket endpoint: " + wsUrl);
+
+  wsServer.begin();
+  wsServer.onEvent(onWsEvent);
+
+  config.api_key = API_KEY;
+  auth.user.email = USER_EMAIL;
+  auth.user.password = USER_PASSWORD;
+  config.token_status_callback = tokenStatusCallback;
+
+  Firebase.begin(&config, &auth);
+  Firebase.reconnectWiFi(true);
+
+  Serial.print("Waiting Firebase auth");
+  unsigned long authStartMs = millis();
+  while (!Firebase.ready() && millis() - authStartMs < 20000) {
+    delay(200);
+    Serial.print(".");
+  }
+  Serial.println();
+
+  Serial.print("Waiting UTC time sync");
+  bool timeReady = syncUtcTimeViaNtp(30000);
+  Serial.println();
+  if (!timeReady) {
+    Serial.println("[Firestore] UTC time sync timeout; timestamped writes will retry later");
+  } else {
+    Serial.println("[Firestore] UTC time synchronized");
+  }
+
+  ensureDeviceDocument();
+  updateDeviceStatus(true);
+  writeReadingSnapshot();
+  logEvent("info", "device_online", "ESP32 simulator connected and reporting online");
+}
+
+void loop() {
+  wsServer.loop();
+
+  if (millis() - lastSimMs >= SIM_INTERVAL_MS) {
+    lastSimMs = millis();
+    simulateSensors();
+    broadcastSnapshot();
+  }
+
+  if (!Firebase.ready()) {
+    delay(50);
+    return;
+  }
+
+  if (millis() - lastStatusMs >= STATUS_INTERVAL_MS) {
+    lastStatusMs = millis();
+    updateDeviceStatus(true);
+  }
+
+  if (millis() - lastCmdPollMs >= CMD_POLL_INTERVAL_MS) {
+    lastCmdPollMs = millis();
+    pollLatestPendingCommand();
+  }
+
+  if (millis() - lastHistoryMs >= HISTORY_INTERVAL_MS) {
+    lastHistoryMs = millis();
+    writeReadingSnapshot();
+  }
+}

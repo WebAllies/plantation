@@ -1,12 +1,13 @@
 #include <WiFi.h>
 #include <Firebase_ESP_Client.h>
+#include <time.h>
 
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
 
 // -------------------- WIFI --------------------
-#define WIFI_SSID "YOUR_WIFI_SSID"
-#define WIFI_PASS "YOUR_WIFI_PASSWORD"
+#define WIFI_SSID "Seif_2..4GHz"
+#define WIFI_PASS "Repiphany2"
 
 // -------------------- FIREBASE --------------------
 #define API_KEY "YOUR_FIREBASE_WEB_API_KEY"
@@ -15,7 +16,8 @@
 #define USER_PASSWORD "YOUR_FIREBASE_PASSWORD"
 
 // -------------------- DEVICE --------------------
-String deviceId = "esp32_01";
+#define DEVICE_ID "esp32_01"
+const char *deviceId = DEVICE_ID;
 
 // GPIO pins (adjust)
 const int PUMP_PIN  = 26;  // relay IN
@@ -31,15 +33,66 @@ FirebaseConfig config;
 
 unsigned long lastStatusMs = 0;
 unsigned long lastCmdPollMs = 0;
+const char *NTP_SERVER_1 = "pool.ntp.org";
+const char *NTP_SERVER_2 = "time.google.com";
+const char *NTP_SERVER_3 = "time.nist.gov";
 
 String deviceDocPath() {
-  return "devices/" + deviceId;
+  return String("devices/") + deviceId;
 }
 String commandsColPath() {
-  return "devices/" + deviceId + "/commands";
+  return String("devices/") + deviceId + "/commands";
 }
 String logsColPath() {
-  return "devices/" + deviceId + "/logs";
+  return String("devices/") + deviceId + "/logs";
+}
+
+bool hasValidUtcTime() {
+  return time(nullptr) >= 1700000000;
+}
+
+String firestoreTimestampNow() {
+  time_t now = time(nullptr);
+  if (now < 1700000000) return "";
+
+  struct tm utcTm;
+  gmtime_r(&now, &utcTm);
+
+  char ts[25];
+  strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%SZ", &utcTm);
+  return String(ts);
+}
+
+bool setTimestampField(FirebaseJson &content, const String &path) {
+  String ts = firestoreTimestampNow();
+  if (ts.length() == 0) {
+    Serial.println("[Firestore] skip write: UTC time not synchronized yet");
+    return false;
+  }
+  content.set(path.c_str(), ts);
+  return true;
+}
+
+bool waitForValidUtcTime(unsigned long timeoutMs) {
+  unsigned long start = millis();
+  while (!hasValidUtcTime() && millis() - start < timeoutMs) {
+    delay(200);
+    Serial.print(".");
+  }
+  return hasValidUtcTime();
+}
+
+bool syncUtcTimeViaNtp(unsigned long timeoutMs) {
+  configTime(0, 0, NTP_SERVER_1, NTP_SERVER_2, NTP_SERVER_3);
+  return waitForValidUtcTime(timeoutMs);
+}
+
+void printFirestoreResult(const String &operation, bool ok) {
+  if (ok) {
+    Serial.println("[Firestore] " + operation + " OK");
+    return;
+  }
+  Serial.println("[Firestore] " + operation + " FAIL: " + fbdo.errorReason());
 }
 
 void setRelay(int pin, bool on) {
@@ -49,14 +102,20 @@ void setRelay(int pin, bool on) {
 
 void logEvent(const String &level, const String &event, const String &detail) {
   FirebaseJson content;
-  content.set("fields/ts/timestampValue", Firebase.getCurrentTime());
+  if (!setTimestampField(content, "fields/ts/timestampValue")) return;
   content.set("fields/level/stringValue", level);
   content.set("fields/event/stringValue", event);
   content.set("fields/detail/stringValue", detail);
   content.set("fields/by/stringValue", "esp32");
 
-  String docName = ""; // auto id
-  Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", logsColPath().c_str(), content.raw());
+  bool ok = Firebase.Firestore.createDocument(
+    &fbdo,
+    FIREBASE_PROJECT_ID,
+    "",
+    logsColPath().c_str(),
+    content.raw()
+  );
+  printFirestoreResult("logEvent", ok);
 }
 
 void updateDeviceStatus(bool online) {
@@ -64,13 +123,13 @@ void updateDeviceStatus(bool online) {
 
   content.set("fields/name/stringValue", "Greenhouse ESP32");
   content.set("fields/online/booleanValue", online);
-  content.set("fields/lastSeen/timestampValue", Firebase.getCurrentTime());
+  if (!setTimestampField(content, "fields/lastSeen/timestampValue")) return;
   content.set("fields/rssi/integerValue", String(WiFi.RSSI()));
   content.set("fields/pumpState/booleanValue", pumpState);
   content.set("fields/valveState/booleanValue", valveState);
 
   // update document
-  Firebase.Firestore.patchDocument(
+  bool ok = Firebase.Firestore.patchDocument(
     &fbdo,
     FIREBASE_PROJECT_ID,
     "",
@@ -78,6 +137,44 @@ void updateDeviceStatus(bool online) {
     content.raw(),
     "name,online,lastSeen,rssi,pumpState,valveState"
   );
+  printFirestoreResult("updateDeviceStatus", ok);
+}
+
+bool ensureDeviceDocument() {
+  FirebaseJson content;
+  content.set("fields/name/stringValue", "Greenhouse ESP32");
+  content.set("fields/online/booleanValue", true);
+  if (!setTimestampField(content, "fields/lastSeen/timestampValue")) return false;
+  content.set("fields/rssi/integerValue", String(WiFi.RSSI()));
+  content.set("fields/pumpState/booleanValue", pumpState);
+  content.set("fields/valveState/booleanValue", valveState);
+  content.set("fields/simulator/booleanValue", false);
+  if (!setTimestampField(content, "fields/createdAt/timestampValue")) return false;
+
+  bool created = Firebase.Firestore.createDocument(
+    &fbdo,
+    FIREBASE_PROJECT_ID,
+    "",
+    "devices",
+    deviceId,
+    content.raw(),
+    ""
+  );
+  if (created) {
+    printFirestoreResult("ensureDeviceDocument create", true);
+    return true;
+  }
+
+  String reason = fbdo.errorReason();
+  if (reason.indexOf("ALREADY_EXISTS") >= 0 ||
+      reason.indexOf("already exists") >= 0 ||
+      reason.indexOf("409") >= 0) {
+    Serial.println("[Firestore] ensureDeviceDocument: existing document found");
+    return true;
+  }
+
+  printFirestoreResult("ensureDeviceDocument create", false);
+  return false;
 }
 
 void setup() {
@@ -105,9 +202,24 @@ void setup() {
   Firebase.begin(&config, &auth);
   Firebase.reconnectWiFi(true);
 
-  // Optionally set time for timestamp (uses NTP internally)
-  Firebase.setSystemTime(0);
+  Serial.print("Waiting Firebase auth");
+  unsigned long authStartMs = millis();
+  while (!Firebase.ready() && millis() - authStartMs < 20000) {
+    delay(200);
+    Serial.print(".");
+  }
+  Serial.println();
 
+  Serial.print("Waiting UTC time sync");
+  bool timeReady = syncUtcTimeViaNtp(30000);
+  Serial.println();
+  if (!timeReady) {
+    Serial.println("[Firestore] UTC time sync timeout; timestamped writes will retry later");
+  } else {
+    Serial.println("[Firestore] UTC time synchronized");
+  }
+
+  ensureDeviceDocument();
   // initial status
   updateDeviceStatus(true);
   logEvent("info", "device_online", "ESP32 connected and reporting online");
@@ -139,49 +251,63 @@ void pollLatestPendingCommand() {
 
   String collectionId = commandsColPath();
   // list documents (latest not guaranteed); small N ok for demo
-  if (Firebase.Firestore.listDocuments(&fbdo, FIREBASE_PROJECT_ID, "", collectionId.c_str(), 10)) {
-    FirebaseJson js;
-    js.setJsonData(fbdo.payload());
+  bool ok = Firebase.Firestore.listDocuments(
+    &fbdo,
+    FIREBASE_PROJECT_ID,
+    "",
+    collectionId.c_str(),
+    10,
+    "",
+    "",
+    "",
+    false
+  );
+  if (!ok) {
+    printFirestoreResult("pollLatestPendingCommand listDocuments", false);
+    return;
+  }
+  printFirestoreResult("pollLatestPendingCommand listDocuments", true);
 
-    FirebaseJsonData arr;
-    js.get(arr, "documents");
-    if (!arr.success) return;
+  FirebaseJson js;
+  js.setJsonData(fbdo.payload());
 
-    // documents is an array; iterate and find status == pending
-    // For simplicity, if multiple, first hit executed.
-    FirebaseJsonArray *docs = arr.to<FirebaseJsonArray>();
-    for (size_t i = 0; i < docs->size(); i++) {
-      FirebaseJsonData docData;
-      docs->get(docData, i);
-      if (!docData.success) continue;
+  FirebaseJsonData arr;
+  js.get(arr, "documents");
+  if (!arr.success) return;
 
-      FirebaseJson docJson;
-      docJson.setJsonData(docData.stringValue);
+  FirebaseJsonArray docs;
+  docs.setJsonArrayData(arr.stringValue);
+  for (size_t i = 0; i < docs.size(); i++) {
+    FirebaseJsonData docData;
+    docs.get(docData, i);
+    if (!docData.success) continue;
+
+    FirebaseJson docJson;
+    docJson.setJsonData(docData.stringValue);
 
       // Extract name (document path)
       FirebaseJsonData nameData;
       docJson.get(nameData, "name");
-      if (!nameData.success) continue;
-      String fullName = nameData.stringValue; // projects/.../documents/devices/.../commands/{id}
+    if (!nameData.success) continue;
+    String fullName = nameData.stringValue; // projects/.../documents/devices/.../commands/{id}
 
       FirebaseJsonData statusData;
       docJson.get(statusData, "fields/status/stringValue");
-      if (!statusData.success) continue;
+    if (!statusData.success) continue;
 
-      if (statusData.stringValue == "pending") {
-        // read fields
-        FirebaseJsonData typeData, targetData;
-        docJson.get(typeData, "fields/type/stringValue");
-        docJson.get(targetData, "fields/targetState/booleanValue");
+    if (statusData.stringValue == "pending") {
+      // read fields
+      FirebaseJsonData typeData, targetData;
+      docJson.get(typeData, "fields/type/stringValue");
+      docJson.get(targetData, "fields/targetState/booleanValue");
 
-        if (!typeData.success || !targetData.success) return;
+      if (!typeData.success || !targetData.success) return;
 
-        String type = typeData.stringValue;
-        bool targetState = targetData.boolValue;
+      String type = typeData.stringValue;
+      bool targetState = targetData.boolValue;
 
-        executeCommand(fullName, type, targetState);
-        return; // execute only one per poll
-      }
+      executeCommand(fullName, type, targetState);
+      return; // execute only one per poll
     }
   }
 }
@@ -218,14 +344,18 @@ void executeCommand(const String &docFullName, const String &type, bool targetSt
   FirebaseJson patch;
   patch.set("fields/status/stringValue", ok ? "executed" : "failed");
   patch.set("fields/message/stringValue", msg);
-  patch.set("fields/executedAt/timestampValue", Firebase.getCurrentTime());
+  String updateMask = "status,message";
+  if (setTimestampField(patch, "fields/executedAt/timestampValue")) {
+    updateMask = "status,message,executedAt";
+  }
 
-  Firebase.Firestore.patchDocument(
+  bool patchOk = Firebase.Firestore.patchDocument(
     &fbdo,
     FIREBASE_PROJECT_ID,
     "",
     docPath.c_str(),
     patch.raw(),
-    "status,message,executedAt"
+    updateMask.c_str()
   );
+  printFirestoreResult("executeCommand patch", patchOk);
 }

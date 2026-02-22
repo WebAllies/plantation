@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:provider/provider.dart';
 
+import 'core/device/device_selection_controller.dart';
 import 'firebase_options.dart';
 
 // Theme controller
@@ -14,9 +16,7 @@ final ThemeController themeController = ThemeController();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   await themeController.load();
 
@@ -28,24 +28,24 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: themeController,
-      builder: (context, _) {
-        return MaterialApp(
-          debugShowCheckedModeBanner: false,
-          title: "AquaFarm",
-          themeMode: themeController.mode,
-          theme: ThemeData(
-            useMaterial3: true,
-            brightness: Brightness.light,
-          ),
-          darkTheme: ThemeData(
-            useMaterial3: true,
-            brightness: Brightness.dark,
-          ),
-          home: const OnboardingPage(), // ✅ always show onboarding
-        );
-      },
+    return ChangeNotifierProvider(
+      create: (_) => DeviceSelectionController(),
+      child: AnimatedBuilder(
+        animation: themeController,
+        builder: (context, _) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            title: "AquaFarm",
+            themeMode: themeController.mode,
+            theme: ThemeData(useMaterial3: true, brightness: Brightness.light),
+            darkTheme: ThemeData(
+              useMaterial3: true,
+              brightness: Brightness.dark,
+            ),
+            home: const OnboardingPage(), // ✅ always show onboarding
+          );
+        },
+      ),
     );
   }
 }

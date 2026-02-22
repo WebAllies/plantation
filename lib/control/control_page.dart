@@ -1,13 +1,13 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../core/config/device_config.dart';
-import 'dart:async';
-
-const String kDeviceId = "esp32_01";
 
 class ControlPage extends StatefulWidget {
-  const ControlPage({super.key});
+  const ControlPage({super.key, required this.selectedDeviceId});
+
+  final String? selectedDeviceId;
 
   @override
   State<ControlPage> createState() => _ControlPageState();
@@ -15,6 +15,7 @@ class ControlPage extends StatefulWidget {
 
 class _ControlPageState extends State<ControlPage> {
   Future<void> _sendCommand({
+    required String deviceId,
     required String type,
     required bool targetState,
   }) async {
@@ -24,7 +25,7 @@ class _ControlPageState extends State<ControlPage> {
 
     final cmdRef = FirebaseFirestore.instance
         .collection('devices')
-        .doc(kDeviceId)
+        .doc(deviceId)
         .collection('commands')
         .doc(); // auto id
 
@@ -41,50 +42,67 @@ class _ControlPageState extends State<ControlPage> {
 
     // Wait for executed feedback (simple: listen once)
     // Wait for executed feedback
-late StreamSubscription<DocumentSnapshot> sub;
+    late StreamSubscription<DocumentSnapshot> sub;
 
-sub = cmdRef.snapshots().listen((doc) {
-  final data = doc.data() as Map<String, dynamic>?;
+    sub = cmdRef.snapshots().listen((doc) {
+      final data = doc.data();
+      if (data is! Map<String, dynamic>) return;
 
-  if (data == null) return;
+      final status = (data['status'] ?? '').toString();
 
-  final status = (data['status'] ?? '').toString();
+      if (status == 'executed') {
+        if (!mounted) return;
 
-  if (status == 'executed') {
-    if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("${type.toUpperCase()} executed ✅")),
+        );
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("${type.toUpperCase()} executed ✅")),
-    );
+        sub.cancel();
+      }
 
-    sub.cancel();
-  }
+      if (status == 'failed') {
+        if (!mounted) return;
 
-  if (status == 'failed') {
-    if (!mounted) return;
+        final msg = (data['message'] ?? 'Failed').toString();
 
-    final msg = (data['message'] ?? 'Failed').toString();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("${type.toUpperCase()} failed ❌: $msg")),
+        );
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("${type.toUpperCase()} failed ❌: $msg")),
-    );
-
-    sub.cancel();
-  }
-});
+        sub.cancel();
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final devRef = FirebaseFirestore.instance.collection('devices').doc(kDeviceId);
+    final deviceId = widget.selectedDeviceId;
+    if (deviceId == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text("Control")),
+        body: const Center(
+          child: Text(
+            "No devices found. Flash an ESP32 with a unique DEVICE_ID and connect it.",
+          ),
+        ),
+      );
+    }
+
+    final devRef = FirebaseFirestore.instance
+        .collection('devices')
+        .doc(deviceId);
 
     return Scaffold(
       appBar: AppBar(title: const Text("Control")),
       body: StreamBuilder<DocumentSnapshot>(
         stream: devRef.snapshots(),
         builder: (context, snap) {
-          if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-          if (!snap.data!.exists) return const Center(child: Text("Device not found"));
+          if (!snap.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (!snap.data!.exists) {
+            return const Center(child: Text("Device not found"));
+          }
 
           final d = snap.data!.data() as Map<String, dynamic>;
           final pumpState = (d['pumpState'] ?? false) as bool;
@@ -98,7 +116,11 @@ sub = cmdRef.snapshots().listen((doc) {
                   title: const Text("Pump"),
                   subtitle: Text(pumpState ? "ON" : "OFF"),
                   value: pumpState,
-                  onChanged: (v) => _sendCommand(type: 'pump', targetState: v),
+                  onChanged: (v) => _sendCommand(
+                    deviceId: deviceId,
+                    type: 'pump',
+                    targetState: v,
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -107,7 +129,11 @@ sub = cmdRef.snapshots().listen((doc) {
                   title: const Text("Valve"),
                   subtitle: Text(valveState ? "OPEN" : "CLOSED"),
                   value: valveState,
-                  onChanged: (v) => _sendCommand(type: 'valve', targetState: v),
+                  onChanged: (v) => _sendCommand(
+                    deviceId: deviceId,
+                    type: 'valve',
+                    targetState: v,
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
