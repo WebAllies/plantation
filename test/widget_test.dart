@@ -193,7 +193,8 @@ void main() {
       await tester.tap(find.byKey(kDeviceSelectorHeaderDropdownKey));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Greenhouse B (gh-2)').last);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
       expect(controller.selectedDeviceId, 'gh-2');
 
       final analyticsDropdown = tester.widget<DropdownButton<String>>(

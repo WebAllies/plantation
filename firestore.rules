@@ -14,16 +14,20 @@ service cloud.firestore {
              );
     }
 
-    function userDoc() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    function userRole() {
+      return isSignedIn()
+             && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+             ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+             : null;
     }
 
-    function userRole() {
-      return isSignedIn() && userDoc().exists() ? userDoc().data.role : null;
+    function hasAdminRole() {
+      return userRole() is string
+             && userRole().matches("(?i)^ *(admin|super[_ ]?admin) *$");
     }
 
     function isAdminOrSuperAdmin() {
-      return userRole() in ["admin", "super_admin"];
+      return hasAdminRole();
     }
 
     function isOwner(uid) {
@@ -47,6 +51,11 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /settings/{docId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdminOrSuperAdmin();
+    }
+
     match /devices/{deviceId} {
       allow read: if isSignedIn();
       allow create, update, delete: if isDeviceAccount() || isAdminOrSuperAdmin();
@@ -66,6 +75,26 @@ service cloud.firestore {
       match /readings/{readingId} {
         allow read: if isSignedIn();
         allow create, update, delete: if isDeviceAccount() || isAdminOrSuperAdmin();
+      }
+
+      match /configs/{configId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isAdminOrSuperAdmin();
+      }
+
+      match /alerts/{alertId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if false;
+      }
+
+      match /alert_state/{docId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if false;
+      }
+
+      match /automation/{docId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if false;
       }
     }
   }

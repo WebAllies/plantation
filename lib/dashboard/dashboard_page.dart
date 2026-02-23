@@ -143,10 +143,14 @@ class _DashboardPageState extends State<DashboardPage> {
 
   StreamSubscription<Map<String, dynamic>>? _mqttFrameSub;
   StreamSubscription<MqttLiveStatus>? _mqttStatusSub;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _alertStateSub;
 
   _TelemetryFrame? _liveFrame;
   DateTime? _lastLiveAt;
   int? _lastLiveTsMs;
+  Timer? _alertReminderTimer;
+  List<String> _activeAlertMetrics = const [];
+  Map<String, dynamic>? _alertStateData;
 
   _SocketState _socketState = _SocketState.disconnected;
   String _socketMessage = 'Waiting for simulator endpoint';
@@ -161,13 +165,22 @@ class _DashboardPageState extends State<DashboardPage> {
   String? _queuedMqttStatusTopic;
 
   @override
+  void initState() {
+    super.initState();
+    _bindAlertState(widget.selectedDeviceId);
+  }
+
+  @override
   void dispose() {
     _reconnectTimer?.cancel();
     _detachSocket();
     _mqttFrameSub?.cancel();
     _mqttStatusSub?.cancel();
+    _alertStateSub?.cancel();
+    _alertReminderTimer?.cancel();
     _mqttFrameSub = null;
     _mqttStatusSub = null;
+    _alertStateSub = null;
     _mqttService.dispose();
     super.dispose();
   }
@@ -194,7 +207,136 @@ class _DashboardPageState extends State<DashboardPage> {
       _activeTransport = _LiveTransport.firestore;
       _socketState = _SocketState.disconnected;
       _socketMessage = 'Waiting for simulator endpoint';
+      _bindAlertState(widget.selectedDeviceId);
     }
+  }
+
+  void _bindAlertState(String? deviceId) {
+    _alertStateSub?.cancel();
+    _alertStateSub = null;
+
+    _activeAlertMetrics = const [];
+    _alertStateData = null;
+    _syncAlertReminderTimer();
+
+    if (deviceId == null) return;
+
+    _alertStateSub = FirebaseFirestore.instance
+        .collection('devices')
+        .doc(deviceId)
+        .collection('alert_state')
+        .doc('current')
+        .snapshots()
+        .listen((snap) {
+          final data = snap.data();
+          final rawMetrics = data?['activeMetrics'];
+          final metrics = rawMetrics is Iterable
+              ? rawMetrics
+                    .map((e) => e.toString())
+                    .where((e) => e.trim().isNotEmpty)
+                    .toList(growable: false)
+              : const <String>[];
+
+          if (!mounted) return;
+          setState(() {
+            _alertStateData = data;
+            _activeAlertMetrics = metrics;
+          });
+          _syncAlertReminderTimer();
+        });
+  }
+
+  void _syncAlertReminderTimer() {
+    final hasActiveAlerts = _activeAlertMetrics.isNotEmpty;
+    if (!hasActiveAlerts) {
+      _alertReminderTimer?.cancel();
+      _alertReminderTimer = null;
+      return;
+    }
+
+    if (_alertReminderTimer != null) return;
+    _alertReminderTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      _showAlertReminder();
+    });
+  }
+
+  void _showAlertReminder() {
+    if (!mounted || _activeAlertMetrics.isEmpty) return;
+    final labels = _activeAlertMetrics.map(_prettyMetric).join(', ');
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('Active sensor alerts: $labels'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+  }
+
+  String _prettyMetric(String metric) {
+    switch (metric) {
+      case 'temperature':
+        return 'Temperature';
+      case 'ph':
+        return 'pH';
+      case 'waterLevel':
+        return 'Water Level';
+      case 'tds':
+        return 'TDS';
+      default:
+        return metric;
+    }
+  }
+
+  String _metricValueForAlert(String metric, _TelemetryFrame frame) {
+    switch (metric) {
+      case 'temperature':
+        return _fmtDouble(frame.temperatureC, '°C');
+      case 'ph':
+        return _fmtDouble(frame.ph, '');
+      case 'waterLevel':
+        return _fmtDouble(frame.waterLevelPct, '%');
+      case 'tds':
+        return _fmtDouble(frame.tdsPpm, 'ppm');
+      default:
+        return '--';
+    }
+  }
+
+  Widget _activeAlertCard(_TelemetryFrame frame) {
+    final source = (_alertStateData?['effectiveSource'] ?? 'global')
+        .toString()
+        .trim();
+    final chips = _activeAlertMetrics
+        .map(
+          (metric) => Chip(
+            avatar: const Icon(Icons.warning_amber_rounded, color: Colors.red),
+            label: Text(
+              '${_prettyMetric(metric)}: ${_metricValueForAlert(metric, frame)}',
+            ),
+          ),
+        )
+        .toList(growable: false);
+
+    return Card(
+      color: Colors.red.shade50,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Active Alerts (${_activeAlertMetrics.length})',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 4),
+            Text('Threshold source: $source'),
+            const SizedBox(height: 8),
+            Wrap(spacing: 8, runSpacing: 8, children: chips),
+          ],
+        ),
+      ),
+    );
   }
 
   void _queueWsUrlSync(String? rawWsUrl) {
@@ -664,6 +806,10 @@ class _DashboardPageState extends State<DashboardPage> {
                   isThreeLine: true,
                 ),
               ),
+              if (_activeAlertMetrics.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _activeAlertCard(activeFrame),
+              ],
               const SizedBox(height: 12),
               Wrap(
                 spacing: 12,

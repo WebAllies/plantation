@@ -8,6 +8,7 @@ Flutter + Firebase + ESP32 telemetry system using managed MQTT for global realti
 - App transport to broker: `wss` (HiveMQ Cloud port `8884`, path `/mqtt`)
 - Device transport to broker: `mqtts` (HiveMQ Cloud port `8883`)
 - Commands: Firestore (`devices/{deviceId}/commands`)
+- Alerting and automation: Firestore-triggered Cloud Functions
 - Fallback when live stream is down: latest Firestore snapshot
 
 Legacy LAN WebSocket (`wsUrl`) is still supported as fallback during migration, but MQTT is the primary path.
@@ -20,9 +21,13 @@ Legacy LAN WebSocket (`wsUrl`) is still supported as fallback during migration, 
    `plantation/{deviceId}/status`
 3. Flutter app reads `devices/{deviceId}` and, when MQTT is enabled, calls callable function:
    `issueMqttCredentials`
-4. Cloud Function returns broker endpoint + auth + topics.
-5. Flutter subscribes and renders realtime values.
-6. If MQTT fails, dashboard still renders Firestore snapshot data.
+4. Cloud Function `evaluateDeviceAlerts` runs on `devices/{deviceId}` updates, evaluates thresholds, writes:
+   - `devices/{deviceId}/alert_state/current`
+   - `devices/{deviceId}/alerts/*`
+5. If low TDS automation is enabled and breached, backend writes pump commands to:
+   `devices/{deviceId}/commands`
+6. Dashboard + Analytics show active alerts and in-app reminders every 15 seconds while alerts are active.
+7. Scheduled Function `cleanupOldAlerts` deletes alert history older than 3 days.
 
 ## Prerequisites
 
@@ -86,17 +91,19 @@ Important:
 - If any key is missing, deploy can prompt interactively.
 - `functions/.env` is gitignored.
 
-## 3) Deploy Functions
+## 3) Deploy Backend
 
 From project root:
 
 ```bash
-npx firebase-tools@latest deploy --only functions --project iotaquaapp
+npx firebase-tools@latest deploy --only functions,firestore:rules --project iotaquaapp
 ```
 
-Deployed callable:
+Deployed backend entries:
 
-- `issueMqttCredentials` (`us-central1`)
+- `issueMqttCredentials` (callable, `us-central1`)
+- `evaluateDeviceAlerts` (Firestore trigger on `devices/{deviceId}`)
+- `cleanupOldAlerts` (scheduled daily retention cleanup)
 
 If asked about Artifact Registry cleanup policy, choose a retention (for example `1` day) to avoid image buildup cost.
 
@@ -113,7 +120,124 @@ Optional legacy fallback:
 
 - `wsUrl`
 
-## 5) ESP32 / ESP32 Simulator Setup
+## 5) Sensor Thresholds and Alerts Schema
+
+Global defaults:
+
+- Doc: `settings/sensors`
+- Fields:
+  - `thresholds.temperatureMinC`
+  - `thresholds.temperatureMaxC`
+  - `thresholds.phMin`
+  - `thresholds.phMax`
+  - `thresholds.waterLevelLowPct`
+  - `thresholds.tdsMinPpm`
+  - `thresholds.tdsMaxPpm`
+  - `automation.lowTdsAutoDoseEnabled`
+  - `automation.pumpMaxRunSec`
+  - `automation.stopTarget` (`tds_max`)
+  - `reminders.inAppIntervalSec` (`15`)
+
+Per-device override:
+
+- Doc: `devices/{deviceId}/configs/sensors`
+- Fields:
+  - `overrideEnabled`
+  - `thresholds.*` (same shape as global)
+  - `automation.lowTdsAutoDoseEnabled`
+
+Runtime alert state:
+
+- Doc: `devices/{deviceId}/alert_state/current`
+- Fields:
+  - `activeMetrics`
+  - `metrics.temperature.state`
+  - `metrics.ph.state`
+  - `metrics.waterLevel.state`
+  - `metrics.tds.state`
+  - `latestValues.*`
+  - `effectiveSource` (`global` or `override`)
+
+Alert history:
+
+- Collection: `devices/{deviceId}/alerts`
+- Typical fields:
+  - `eventType` (`breach_started`, `recovered`, `auto_dose_started`, `auto_dose_completed`, `auto_dose_timeout`)
+  - `metric`, `state`, `value`, `message`, `thresholdSnapshot`, `source`, `createdAt`
+- Retention: 3 days via scheduled cleanup.
+
+Automation state:
+
+- Doc: `devices/{deviceId}/automation/tds`
+- Fields: `active`, `startedAt`, `targetTdsMax`, `timeoutSec`, `lastAction`, `updatedAt`
+
+## 6) Quick Start: Sensor Thresholds (First Run)
+
+Use this when you set up threshold logic for the first time.
+
+1. Deploy backend and rules:
+
+```bash
+npx firebase-tools@latest deploy --only functions,firestore:rules --project iotaquaapp
+```
+
+2. Open the app and go to `Settings -> Sensors`.
+
+3. In `Global Defaults`, set and save:
+   - Temperature Min/Max: `22` / `28`
+   - pH Min/Max: `6.0` / `7.2`
+   - Water Level Low: `30`
+   - TDS Min/Max: `800` / `1200`
+   - Auto-dose for low TDS: `OFF` (default first run)
+
+4. Optional per-device override:
+   - Select a greenhouse/device from the header selector
+   - Enable `Device Override`
+   - Set override values and save to `devices/{deviceId}/configs/sensors`
+
+5. Verify Firestore writes:
+   - `settings/sensors` exists and has `thresholds.*`, `automation.*`, `reminders.inAppIntervalSec`
+   - `devices/{deviceId}/configs/sensors` exists when override is saved
+
+6. Verify alert pipeline:
+   - Open `Dashboard` and `Analytics` for the same device
+   - If telemetry goes out of range, expect:
+     - `devices/{deviceId}/alert_state/current.activeMetrics` contains breached metric(s)
+     - New docs in `devices/{deviceId}/alerts` with `eventType: breach_started`
+     - In-app reminder SnackBar every ~15 seconds while alerts remain active
+
+7. Verify low-TDS automation (only when enabled):
+   - Turn ON low-TDS auto-dose in effective settings (global or override)
+   - Cause low TDS condition (`tdsPpm < tdsMinPpm`)
+   - Expect:
+     - Pending command in `devices/{deviceId}/commands` with `type: pump`, `targetState: true`
+     - `devices/{deviceId}/automation/tds.active == true`
+     - `auto_dose_started` event in `devices/{deviceId}/alerts`
+   - When `tdsPpm >= tdsMaxPpm` (or timeout), expect pump stop command + completion/timeout event
+
+## 7) App Behavior
+
+Dashboard:
+
+- Uses MQTT when `realtimeTransport == "mqtt"` and `mqttEnabled == true`
+- Falls back to Firestore/legacy transport if MQTT is unavailable
+- Shows active alert card from `alert_state/current`
+- Shows in-app alert reminder every 15 seconds while alerts are active
+
+Analytics:
+
+- Contains an Alerts section
+- Shows active alerts from `alert_state/current`
+- Shows alert history for the last 3 days from `devices/{deviceId}/alerts`
+- Runs same 15-second in-app reminder while alerts are active
+
+Settings -> Sensors:
+
+- Global threshold editor (`settings/sensors`)
+- Device override editor (`devices/{deviceId}/configs/sensors`)
+- Validation for ranges and numeric values
+
+## 8) ESP32 / ESP32 Simulator Setup
 
 Files:
 
@@ -135,17 +259,12 @@ The sketches already publish:
 - live telemetry to `plantation/{deviceId}/telemetry/live`
 - retained status/LWT to `plantation/{deviceId}/status`
 
-## 6) Run Flutter App
+## 9) Run Flutter App
 
 ```bash
 flutter pub get
 flutter run
 ```
-
-Dashboard behavior:
-
-- Uses MQTT when `realtimeTransport == "mqtt"` and `mqttEnabled == true`.
-- Falls back to Firestore/legacy transport if MQTT is unavailable.
 
 ## Telemetry Payload Contract
 
@@ -179,10 +298,6 @@ Correct. Secret Manager requires Blaze. This repo avoids it by using `functions/
 
 Your `functions/.env` is missing one or more required keys. Add all keys listed above.
 
-### Flutter analyzer error: `websocketPath` setter not defined
-
-Use current implementation in `lib/core/realtime/mqtt_client_factory_io.dart` that builds the full websocket URL in constructor and does not set `client.websocketPath`.
-
 ### Dashboard shows fallback only (no live stream)
 
 Check:
@@ -191,6 +306,23 @@ Check:
 - HiveMQ credential/ACL is correct
 - Function `issueMqttCredentials` deployed successfully
 - App user is signed in (callable is authenticated)
+
+### Alerts are not being generated
+
+Check:
+
+- `evaluateDeviceAlerts` is deployed
+- Firestore rules are deployed
+- Telemetry fields are present on `devices/{deviceId}` (`temperatureC`, `ph`, `waterLevelPct`, `tdsPpm`)
+- Threshold docs exist or defaults are being used
+
+### Auto-dose is not triggering
+
+Check:
+
+- Effective settings have `lowTdsAutoDoseEnabled == true`
+- Current `tdsPpm` is below configured `tdsMinPpm`
+- Device command polling is working for `devices/{deviceId}/commands`
 
 ### ESP32 compile error: sketch too big
 

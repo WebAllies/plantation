@@ -1,7 +1,9 @@
 const admin = require('firebase-admin');
 const jwt = require('jsonwebtoken');
 const { setGlobalOptions } = require('firebase-functions/v2');
+const { onDocumentUpdated, onDocumentWritten } = require('firebase-functions/v2/firestore');
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { defineString } = require('firebase-functions/params');
 
 if (!admin.apps.length) {
@@ -22,6 +24,32 @@ const MQTT_USERNAME_STATIC = defineString('MQTT_USERNAME_STATIC');
 const MQTT_USERNAME_PREFIX = defineString('MQTT_USERNAME_PREFIX');
 
 const TOKEN_TTL_SECONDS = 15 * 60;
+const ALERT_RETENTION_DAYS = 3;
+const ALERT_CLEANUP_BATCH_SIZE = 300;
+const DEVICE_RECOMPUTE_BATCH_SIZE = 200;
+
+const AUTOMATION_USER_UID = 'system_automation';
+const AUTOMATION_USER_EMAIL = 'automation@system.local';
+
+const DEFAULT_SETTINGS = {
+  thresholds: {
+    temperatureMinC: 22.0,
+    temperatureMaxC: 28.0,
+    phMin: 6.0,
+    phMax: 7.2,
+    waterLevelLowPct: 30.0,
+    tdsMinPpm: 800.0,
+    tdsMaxPpm: 1200.0,
+  },
+  automation: {
+    lowTdsAutoDoseEnabled: false,
+    pumpMaxRunSec: 300,
+    stopTarget: 'tds_max',
+  },
+  reminders: {
+    inAppIntervalSec: 15,
+  },
+};
 
 function asBool(value, defaultValue) {
   if (value == null || value === '') return defaultValue;
@@ -35,6 +63,17 @@ function asInt(value, defaultValue) {
   if (value == null || value === '') return defaultValue;
   const parsed = Number.parseInt(String(value), 10);
   return Number.isNaN(parsed) ? defaultValue : parsed;
+}
+
+function asNumber(value, defaultValue) {
+  if (value == null || value === '') return defaultValue;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : defaultValue;
+}
+
+function asMap(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return value;
 }
 
 function cleanTopic(topicValue, fallback) {
@@ -99,6 +138,257 @@ function parseBrokerConfig() {
   };
 }
 
+function readTelemetry(data) {
+  return {
+    temperatureC: numberOrNull(data.temperatureC),
+    ph: numberOrNull(data.ph),
+    waterLevelPct: numberOrNull(data.waterLevelPct),
+    tdsPpm: numberOrNull(data.tdsPpm),
+  };
+}
+
+function numberOrNull(value) {
+  if (value == null) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeGlobalSettings(raw) {
+  const data = asMap(raw);
+  const thresholdsMap = asMap(data.thresholds);
+  const automationMap = asMap(data.automation);
+  const remindersMap = asMap(data.reminders);
+
+  return {
+    thresholds: {
+      temperatureMinC: asNumber(
+        thresholdsMap.temperatureMinC,
+        DEFAULT_SETTINGS.thresholds.temperatureMinC,
+      ),
+      temperatureMaxC: asNumber(
+        thresholdsMap.temperatureMaxC,
+        DEFAULT_SETTINGS.thresholds.temperatureMaxC,
+      ),
+      phMin: asNumber(thresholdsMap.phMin, DEFAULT_SETTINGS.thresholds.phMin),
+      phMax: asNumber(thresholdsMap.phMax, DEFAULT_SETTINGS.thresholds.phMax),
+      waterLevelLowPct: asNumber(
+        thresholdsMap.waterLevelLowPct,
+        DEFAULT_SETTINGS.thresholds.waterLevelLowPct,
+      ),
+      tdsMinPpm: asNumber(
+        thresholdsMap.tdsMinPpm,
+        DEFAULT_SETTINGS.thresholds.tdsMinPpm,
+      ),
+      tdsMaxPpm: asNumber(
+        thresholdsMap.tdsMaxPpm,
+        DEFAULT_SETTINGS.thresholds.tdsMaxPpm,
+      ),
+    },
+    automation: {
+      lowTdsAutoDoseEnabled: asBool(
+        automationMap.lowTdsAutoDoseEnabled,
+        DEFAULT_SETTINGS.automation.lowTdsAutoDoseEnabled,
+      ),
+      pumpMaxRunSec: asInt(
+        automationMap.pumpMaxRunSec,
+        DEFAULT_SETTINGS.automation.pumpMaxRunSec,
+      ),
+      stopTarget: String(automationMap.stopTarget || DEFAULT_SETTINGS.automation.stopTarget),
+    },
+    reminders: {
+      inAppIntervalSec: asInt(
+        remindersMap.inAppIntervalSec,
+        DEFAULT_SETTINGS.reminders.inAppIntervalSec,
+      ),
+    },
+  };
+}
+
+function normalizeDeviceOverride(raw) {
+  const data = asMap(raw);
+  const thresholdsMap = asMap(data.thresholds);
+  const automationMap = asMap(data.automation);
+
+  return {
+    overrideEnabled: asBool(data.overrideEnabled, false),
+    thresholds: {
+      temperatureMinC: asNumber(
+        thresholdsMap.temperatureMinC,
+        DEFAULT_SETTINGS.thresholds.temperatureMinC,
+      ),
+      temperatureMaxC: asNumber(
+        thresholdsMap.temperatureMaxC,
+        DEFAULT_SETTINGS.thresholds.temperatureMaxC,
+      ),
+      phMin: asNumber(thresholdsMap.phMin, DEFAULT_SETTINGS.thresholds.phMin),
+      phMax: asNumber(thresholdsMap.phMax, DEFAULT_SETTINGS.thresholds.phMax),
+      waterLevelLowPct: asNumber(
+        thresholdsMap.waterLevelLowPct,
+        DEFAULT_SETTINGS.thresholds.waterLevelLowPct,
+      ),
+      tdsMinPpm: asNumber(
+        thresholdsMap.tdsMinPpm,
+        DEFAULT_SETTINGS.thresholds.tdsMinPpm,
+      ),
+      tdsMaxPpm: asNumber(
+        thresholdsMap.tdsMaxPpm,
+        DEFAULT_SETTINGS.thresholds.tdsMaxPpm,
+      ),
+    },
+    automation: {
+      lowTdsAutoDoseEnabled: asBool(
+        automationMap.lowTdsAutoDoseEnabled,
+        DEFAULT_SETTINGS.automation.lowTdsAutoDoseEnabled,
+      ),
+    },
+  };
+}
+
+function resolveEffectiveSettings(globalSettings, overrideSettings) {
+  const usingOverride = overrideSettings && overrideSettings.overrideEnabled;
+  if (!usingOverride) {
+    return { source: 'global', ...globalSettings };
+  }
+
+  return {
+    source: 'override',
+    thresholds: overrideSettings.thresholds,
+    automation: {
+      lowTdsAutoDoseEnabled: overrideSettings.automation.lowTdsAutoDoseEnabled,
+      pumpMaxRunSec: globalSettings.automation.pumpMaxRunSec,
+      stopTarget: globalSettings.automation.stopTarget,
+    },
+    reminders: globalSettings.reminders,
+  };
+}
+
+function metricStateRange(value, min, max) {
+  if (value == null) return 'unknown';
+  if (value < min) return 'low';
+  if (value > max) return 'high';
+  return 'normal';
+}
+
+function metricStateLowOnly(value, lowThreshold) {
+  if (value == null) return 'unknown';
+  if (value < lowThreshold) return 'low';
+  return 'normal';
+}
+
+function evaluateMetrics(readings, thresholds) {
+  const temperature = metricStateRange(
+    readings.temperatureC,
+    thresholds.temperatureMinC,
+    thresholds.temperatureMaxC,
+  );
+  const ph = metricStateRange(readings.ph, thresholds.phMin, thresholds.phMax);
+  const waterLevel = metricStateLowOnly(
+    readings.waterLevelPct,
+    thresholds.waterLevelLowPct,
+  );
+  const tds = metricStateRange(readings.tdsPpm, thresholds.tdsMinPpm, thresholds.tdsMaxPpm);
+
+  const activeMetrics = [];
+  if (temperature === 'low' || temperature === 'high') activeMetrics.push('temperature');
+  if (ph === 'low' || ph === 'high') activeMetrics.push('ph');
+  if (waterLevel === 'low') activeMetrics.push('waterLevel');
+  if (tds === 'low' || tds === 'high') activeMetrics.push('tds');
+
+  return {
+    metrics: { temperature, ph, waterLevel, tds },
+    activeMetrics,
+  };
+}
+
+function stateFromPrevious(previousMetrics, metricName) {
+  const metricData = asMap(previousMetrics[metricName]);
+  return String(metricData.state || 'unknown');
+}
+
+function prettyMetric(metric) {
+  switch (metric) {
+    case 'temperature':
+      return 'Temperature';
+    case 'ph':
+      return 'pH';
+    case 'waterLevel':
+      return 'Water level';
+    case 'tds':
+      return 'TDS';
+    default:
+      return metric;
+  }
+}
+
+function prettyState(state) {
+  switch (state) {
+    case 'low':
+      return 'LOW';
+    case 'high':
+      return 'HIGH';
+    case 'normal':
+      return 'NORMAL';
+    default:
+      return state.toUpperCase();
+  }
+}
+
+function buildTransitionMessage({ metric, state, eventType }) {
+  const metricLabel = prettyMetric(metric);
+  if (eventType === 'recovered') {
+    return `${metricLabel} recovered to normal range`;
+  }
+  return `${metricLabel} is ${prettyState(state)}`;
+}
+
+function thresholdSnapshot(thresholds) {
+  return {
+    temperatureMinC: thresholds.temperatureMinC,
+    temperatureMaxC: thresholds.temperatureMaxC,
+    phMin: thresholds.phMin,
+    phMax: thresholds.phMax,
+    waterLevelLowPct: thresholds.waterLevelLowPct,
+    tdsMinPpm: thresholds.tdsMinPpm,
+    tdsMaxPpm: thresholds.tdsMaxPpm,
+  };
+}
+
+function metricValueForAlert(metric, readings) {
+  switch (metric) {
+    case 'temperature':
+      return readings.temperatureC;
+    case 'ph':
+      return readings.ph;
+    case 'waterLevel':
+      return readings.waterLevelPct;
+    case 'tds':
+      return readings.tdsPpm;
+    default:
+      return null;
+  }
+}
+
+function commandPayload(targetState, reason) {
+  return {
+    type: 'pump',
+    targetState,
+    status: 'pending',
+    requestedBy: AUTOMATION_USER_UID,
+    requestedByEmail: AUTOMATION_USER_EMAIL,
+    requestedAt: admin.firestore.FieldValue.serverTimestamp(),
+    executedAt: null,
+    message: '',
+    reason,
+  };
+}
+
+function asDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value.toDate === 'function') return value.toDate();
+  return null;
+}
+
 async function assertUserCanAccessDevice(uid, deviceId) {
   const db = admin.firestore();
 
@@ -127,90 +417,425 @@ async function assertUserCanAccessDevice(uid, deviceId) {
 
 exports.issueMqttCredentials = onCall(
   async (request) => {
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'Authentication is required');
-  }
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'Authentication is required');
+    }
 
-  const rawDeviceId = (request.data && request.data.deviceId ? request.data.deviceId : '')
-    .toString()
-    .trim();
+    const rawDeviceId = (request.data && request.data.deviceId ? request.data.deviceId : '')
+      .toString()
+      .trim();
 
-  if (!rawDeviceId || !/^[A-Za-z0-9_-]{3,64}$/.test(rawDeviceId)) {
-    throw new HttpsError('invalid-argument', 'A valid deviceId is required');
-  }
+    if (!rawDeviceId || !/^[A-Za-z0-9_-]{3,64}$/.test(rawDeviceId)) {
+      throw new HttpsError('invalid-argument', 'A valid deviceId is required');
+    }
 
-  await assertUserCanAccessDevice(request.auth.uid, rawDeviceId);
+    await assertUserCanAccessDevice(request.auth.uid, rawDeviceId);
 
-  const liveTopic = cleanTopic(
-    request.data ? request.data.liveTopic : null,
-    `plantation/${rawDeviceId}/telemetry/live`,
-  );
-  const statusTopic = cleanTopic(
-    request.data ? request.data.statusTopic : null,
-    `plantation/${rawDeviceId}/status`,
-  );
-
-  const broker = parseBrokerConfig();
-
-  const staticUsername = (MQTT_USERNAME_STATIC.value() || '').trim();
-  const usernamePrefix = (MQTT_USERNAME_PREFIX.value() || 'app').trim() || 'app';
-  const username = staticUsername || `${usernamePrefix}_${request.auth.uid}`;
-
-  const nowSeconds = Math.floor(Date.now() / 1000);
-  const expiresAtSeconds = nowSeconds + TOKEN_TTL_SECONDS;
-  const clientId = `app-${rawDeviceId}-${Date.now()}`;
-
-  let password = '';
-  const jwtSecret = (MQTT_JWT_SECRET.value() || '').trim();
-  const staticPassword = (MQTT_PASSWORD_STATIC.value() || '').trim();
-
-  if (jwtSecret) {
-    password = jwt.sign(
-      {
-        sub: request.auth.uid,
-        aud: 'mqtt',
-        deviceId: rawDeviceId,
-        topic: liveTopic,
-        statusTopic,
-        iat: nowSeconds,
-        exp: expiresAtSeconds,
-      },
-      jwtSecret,
-      {
-        algorithm: 'HS256',
-        issuer: 'iotaquaapp',
-      },
+    const liveTopic = cleanTopic(
+      request.data ? request.data.liveTopic : null,
+      `plantation/${rawDeviceId}/telemetry/live`,
     );
-  } else if (staticPassword) {
-    password = staticPassword;
-  } else {
-    throw new HttpsError(
-      'failed-precondition',
-      'No MQTT auth secret configured. Set MQTT_JWT_SECRET or MQTT_PASSWORD_STATIC.',
+    const statusTopic = cleanTopic(
+      request.data ? request.data.statusTopic : null,
+      `plantation/${rawDeviceId}/status`,
     );
+
+    const broker = parseBrokerConfig();
+
+    const staticUsername = (MQTT_USERNAME_STATIC.value() || '').trim();
+    const usernamePrefix = (MQTT_USERNAME_PREFIX.value() || 'app').trim() || 'app';
+    const username = staticUsername || `${usernamePrefix}_${request.auth.uid}`;
+
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const expiresAtSeconds = nowSeconds + TOKEN_TTL_SECONDS;
+    const clientId = `app-${rawDeviceId}-${Date.now()}`;
+
+    let password = '';
+    const jwtSecret = (MQTT_JWT_SECRET.value() || '').trim();
+    const staticPassword = (MQTT_PASSWORD_STATIC.value() || '').trim();
+
+    if (jwtSecret) {
+      password = jwt.sign(
+        {
+          sub: request.auth.uid,
+          aud: 'mqtt',
+          deviceId: rawDeviceId,
+          topic: liveTopic,
+          statusTopic,
+          iat: nowSeconds,
+          exp: expiresAtSeconds,
+        },
+        jwtSecret,
+        {
+          algorithm: 'HS256',
+          issuer: 'iotaquaapp',
+        },
+      );
+    } else if (staticPassword) {
+      password = staticPassword;
+    } else {
+      throw new HttpsError(
+        'failed-precondition',
+        'No MQTT auth secret configured. Set MQTT_JWT_SECRET or MQTT_PASSWORD_STATIC.',
+      );
+    }
+
+    const endpointScheme = broker.useWebSocket
+      ? broker.useTls
+        ? 'wss'
+        : 'ws'
+      : broker.useTls
+        ? 'mqtts'
+        : 'mqtt';
+
+    return {
+      brokerUrl: broker.brokerUrl || `${endpointScheme}://${broker.host}:${broker.port}${broker.wsPath}`,
+      brokerHost: broker.host,
+      brokerPort: broker.port,
+      wsPath: broker.wsPath,
+      useTls: broker.useTls,
+      useWebSocket: broker.useWebSocket,
+      clientId,
+      username,
+      password,
+      liveTopic,
+      statusTopic,
+      expiresAtEpochMs: expiresAtSeconds * 1000,
+    };
+  },
+);
+
+async function evaluateAndPersistDeviceAlerts(deviceId, { deviceData } = {}) {
+  const db = admin.firestore();
+  let data = deviceData;
+
+  if (!data || typeof data !== 'object') {
+    const deviceSnap = await db.collection('devices').doc(deviceId).get();
+    if (!deviceSnap.exists) return { status: 'device_missing' };
+    data = deviceSnap.data() || {};
   }
 
-  const endpointScheme = broker.useWebSocket
-    ? broker.useTls
-      ? 'wss'
-      : 'ws'
-    : broker.useTls
-      ? 'mqtts'
-      : 'mqtt';
+  const readings = readTelemetry(data);
+  if (
+    readings.temperatureC == null &&
+    readings.ph == null &&
+    readings.waterLevelPct == null &&
+    readings.tdsPpm == null
+  ) {
+    return { status: 'no_telemetry' };
+  }
 
-  return {
-    brokerUrl: broker.brokerUrl || `${endpointScheme}://${broker.host}:${broker.port}${broker.wsPath}`,
-    brokerHost: broker.host,
-    brokerPort: broker.port,
-    wsPath: broker.wsPath,
-    useTls: broker.useTls,
-    useWebSocket: broker.useWebSocket,
-    clientId,
-    username,
-    password,
-    liveTopic,
-    statusTopic,
-    expiresAtEpochMs: expiresAtSeconds * 1000,
-  };
+  const [globalSnap, overrideSnap, alertStateSnap, automationSnap] = await Promise.all([
+    db.collection('settings').doc('sensors').get(),
+    db.collection('devices').doc(deviceId).collection('configs').doc('sensors').get(),
+    db.collection('devices').doc(deviceId).collection('alert_state').doc('current').get(),
+    db.collection('devices').doc(deviceId).collection('automation').doc('tds').get(),
+  ]);
+
+  const globalSettings = normalizeGlobalSettings(globalSnap.data());
+  const overrideSettings = normalizeDeviceOverride(overrideSnap.data());
+  const effective = resolveEffectiveSettings(globalSettings, overrideSettings);
+  const evaluation = evaluateMetrics(readings, effective.thresholds);
+
+  const previousData = alertStateSnap.exists ? alertStateSnap.data() : {};
+  const previousMetrics = asMap(previousData.metrics);
+  const alertsCollection = db.collection('devices').doc(deviceId).collection('alerts');
+
+  const batch = db.batch();
+
+  for (const metric of ['temperature', 'ph', 'waterLevel', 'tds']) {
+    const previousState = stateFromPrevious(previousMetrics, metric);
+    const currentState = evaluation.metrics[metric];
+    if (previousState === currentState) continue;
+
+    let eventType = null;
+    if (currentState === 'low' || currentState === 'high') {
+      eventType = 'breach_started';
+    } else if (
+      (previousState === 'low' || previousState === 'high') &&
+      currentState === 'normal'
+    ) {
+      eventType = 'recovered';
+    }
+
+    if (!eventType) continue;
+
+    const alertRef = alertsCollection.doc();
+    batch.set(alertRef, {
+      eventType,
+      metric,
+      state: currentState,
+      value: metricValueForAlert(metric, readings),
+      message: buildTransitionMessage({ metric, state: currentState, eventType }),
+      thresholdSnapshot: thresholdSnapshot(effective.thresholds),
+      source: effective.source,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  }
+
+  batch.set(
+    db.collection('devices').doc(deviceId).collection('alert_state').doc('current'),
+    {
+      activeMetrics: evaluation.activeMetrics,
+      metrics: {
+        temperature: { state: evaluation.metrics.temperature },
+        ph: { state: evaluation.metrics.ph },
+        waterLevel: { state: evaluation.metrics.waterLevel },
+        tds: { state: evaluation.metrics.tds },
+      },
+      latestValues: {
+        temperatureC: readings.temperatureC,
+        ph: readings.ph,
+        waterLevelPct: readings.waterLevelPct,
+        tdsPpm: readings.tdsPpm,
+      },
+      effectiveSource: effective.source,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+
+  await batch.commit();
+
+  const automationRef = db.collection('devices').doc(deviceId).collection('automation').doc('tds');
+  const automationData = automationSnap.exists ? automationSnap.data() : {};
+  const automationActive = asBool(automationData.active, false);
+  const automationStartedAt = asDate(automationData.startedAt);
+  const autoDoseEnabled = asBool(
+    effective.automation.lowTdsAutoDoseEnabled,
+    DEFAULT_SETTINGS.automation.lowTdsAutoDoseEnabled,
+  );
+  const maxRunSec = Math.max(
+    60,
+    asInt(effective.automation.pumpMaxRunSec, DEFAULT_SETTINGS.automation.pumpMaxRunSec),
+  );
+  const currentTds = readings.tdsPpm;
+  const targetTdsMax = effective.thresholds.tdsMaxPpm;
+
+  const now = Date.now();
+  const elapsedSec = automationStartedAt
+    ? Math.floor((now - automationStartedAt.getTime()) / 1000)
+    : 0;
+
+  const shouldStopOnTarget =
+    automationActive &&
+    currentTds != null &&
+    currentTds >= targetTdsMax &&
+    String(effective.automation.stopTarget || 'tds_max') === 'tds_max';
+  const shouldStopOnTimeout = automationActive && elapsedSec >= maxRunSec;
+
+  if (shouldStopOnTarget || shouldStopOnTimeout) {
+    const reason = shouldStopOnTarget ? 'auto_dose_completed' : 'auto_dose_timeout';
+    await db.runTransaction(async (tx) => {
+      const currentAutomationSnap = await tx.get(automationRef);
+      const liveAutomation = currentAutomationSnap.exists ? currentAutomationSnap.data() : {};
+      if (!asBool(liveAutomation.active, false)) return;
+
+      const commandRef = db.collection('devices').doc(deviceId).collection('commands').doc();
+      const alertRef = alertsCollection.doc();
+
+      tx.set(commandRef, commandPayload(false, reason));
+      tx.set(
+        automationRef,
+        {
+          active: false,
+          startedAt: null,
+          targetTdsMax,
+          timeoutSec: maxRunSec,
+          lastAction: reason,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+      tx.set(alertRef, {
+        eventType: reason,
+        metric: 'tds',
+        state: evaluation.metrics.tds,
+        value: currentTds,
+        message:
+          reason === 'auto_dose_completed'
+            ? 'Auto-dose completed after reaching TDS target'
+            : 'Auto-dose timed out after maximum run time',
+        thresholdSnapshot: thresholdSnapshot(effective.thresholds),
+        source: effective.source,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+    return { status: 'ok' };
+  }
+
+  if (!automationActive && autoDoseEnabled && evaluation.metrics.tds === 'low') {
+    await db.runTransaction(async (tx) => {
+      const currentAutomationSnap = await tx.get(automationRef);
+      const liveAutomation = currentAutomationSnap.exists ? currentAutomationSnap.data() : {};
+      if (asBool(liveAutomation.active, false)) return;
+
+      const commandRef = db.collection('devices').doc(deviceId).collection('commands').doc();
+      const alertRef = alertsCollection.doc();
+
+      tx.set(commandRef, commandPayload(true, 'auto_dose_started'));
+      tx.set(
+        automationRef,
+        {
+          active: true,
+          startedAt: admin.firestore.FieldValue.serverTimestamp(),
+          targetTdsMax,
+          timeoutSec: maxRunSec,
+          lastAction: 'auto_dose_started',
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+      tx.set(alertRef, {
+        eventType: 'auto_dose_started',
+        metric: 'tds',
+        state: evaluation.metrics.tds,
+        value: currentTds,
+        message: 'Auto-dose started because TDS is below minimum',
+        thresholdSnapshot: thresholdSnapshot(effective.thresholds),
+        source: effective.source,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+    return { status: 'ok' };
+  }
+
+  if (automationActive && !autoDoseEnabled) {
+    await db.runTransaction(async (tx) => {
+      const currentAutomationSnap = await tx.get(automationRef);
+      const liveAutomation = currentAutomationSnap.exists ? currentAutomationSnap.data() : {};
+      if (!asBool(liveAutomation.active, false)) return;
+
+      const commandRef = db.collection('devices').doc(deviceId).collection('commands').doc();
+      const alertRef = alertsCollection.doc();
+
+      tx.set(commandRef, commandPayload(false, 'auto_dose_disabled'));
+      tx.set(
+        automationRef,
+        {
+          active: false,
+          startedAt: null,
+          targetTdsMax,
+          timeoutSec: maxRunSec,
+          lastAction: 'auto_dose_disabled',
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+      tx.set(alertRef, {
+        eventType: 'auto_dose_disabled',
+        metric: 'tds',
+        state: evaluation.metrics.tds,
+        value: currentTds,
+        message: 'Auto-dose stopped because automation was disabled',
+        thresholdSnapshot: thresholdSnapshot(effective.thresholds),
+        source: effective.source,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  return { status: 'ok' };
+}
+
+exports.evaluateDeviceAlerts = onDocumentUpdated(
+  'devices/{deviceId}',
+  async (event) => {
+    const after = event.data && event.data.after ? event.data.after : null;
+    if (!after || !after.exists) return;
+
+    const deviceId = event.params.deviceId;
+    const deviceData = after.data() || {};
+    await evaluateAndPersistDeviceAlerts(deviceId, { deviceData });
+  },
+);
+
+exports.recomputeAlertsOnGlobalThresholdsWrite = onDocumentWritten(
+  'settings/sensors',
+  async (event) => {
+    const db = admin.firestore();
+    const afterSnap = event.data && event.data.after ? event.data.after : null;
+    if (!afterSnap || !afterSnap.exists) {
+      console.warn(
+        'settings/sensors deleted; recomputing all devices using DEFAULT_SETTINGS fallback.',
+      );
+    }
+
+    let processed = 0;
+    let failed = 0;
+    let lastDocId = null;
+
+    while (true) {
+      let query = db
+        .collection('devices')
+        .orderBy(admin.firestore.FieldPath.documentId())
+        .limit(DEVICE_RECOMPUTE_BATCH_SIZE);
+
+      if (lastDocId != null) {
+        query = query.startAfter(lastDocId);
+      }
+
+      const deviceSnap = await query.get();
+      if (deviceSnap.empty) break;
+
+      for (const doc of deviceSnap.docs) {
+        try {
+          await evaluateAndPersistDeviceAlerts(doc.id, { deviceData: doc.data() || {} });
+          processed += 1;
+        } catch (error) {
+          failed += 1;
+          console.error(`recomputeAlertsOnGlobalThresholdsWrite failed for ${doc.id}`, error);
+        }
+      }
+
+      lastDocId = deviceSnap.docs[deviceSnap.docs.length - 1].id;
+      if (deviceSnap.size < DEVICE_RECOMPUTE_BATCH_SIZE) break;
+    }
+
+    console.log(
+      `recomputeAlertsOnGlobalThresholdsWrite complete processed=${processed} failed=${failed}`,
+    );
+  },
+);
+
+exports.recomputeAlertsOnDeviceOverrideWrite = onDocumentWritten(
+  'devices/{deviceId}/configs/sensors',
+  async (event) => {
+    const deviceId = event.params.deviceId;
+    await evaluateAndPersistDeviceAlerts(deviceId);
+  },
+);
+
+exports.cleanupOldAlerts = onSchedule(
+  {
+    schedule: 'every 24 hours',
+    timeZone: 'Etc/UTC',
+  },
+  async () => {
+    const db = admin.firestore();
+    const cutoff = new Date(Date.now() - ALERT_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+    let totalDeleted = 0;
+
+    while (true) {
+      const snapshot = await db
+        .collectionGroup('alerts')
+        .where('createdAt', '<', cutoff)
+        .orderBy('createdAt')
+        .limit(ALERT_CLEANUP_BATCH_SIZE)
+        .get();
+
+      if (snapshot.empty) break;
+
+      const batch = db.batch();
+      for (const doc of snapshot.docs) {
+        batch.delete(doc.ref);
+      }
+      await batch.commit();
+      totalDeleted += snapshot.size;
+
+      if (snapshot.size < ALERT_CLEANUP_BATCH_SIZE) break;
+    }
+
+    console.log(`cleanupOldAlerts deleted ${totalDeleted} docs`);
   },
 );
