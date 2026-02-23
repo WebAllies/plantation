@@ -287,28 +287,53 @@ class TfliteService {
         return (channelValue / 127.5) - 1.0;
       case '[0,1]':
         return channelValue / 255.0;
+      case '[0,255]':
+      case '[0,255.0]':
+      case 'raw':
+      case 'none':
+        return channelValue.toDouble();
       default:
         return (channelValue / 127.5) - 1.0;
     }
   }
 
   int _toQuantizedByte(double normalizedValue) {
+    final mode = _modelConfig.normalization.replaceAll(' ', '').trim();
     if (_inputScale > 0) {
       final q = (normalizedValue / _inputScale + _inputZeroPoint).round();
       return q.clamp(0, 255).toInt();
     }
 
-    if (_modelConfig.normalization.replaceAll(' ', '') == '[0,1]') {
+    if (mode == '[0,1]') {
       return (normalizedValue * 255.0).round().clamp(0, 255).toInt();
+    }
+
+    if (mode == '[0,255]' ||
+        mode == '[0,255.0]' ||
+        mode == 'raw' ||
+        mode == 'none') {
+      return normalizedValue.round().clamp(0, 255).toInt();
     }
 
     return ((normalizedValue + 1.0) * 127.5).round().clamp(0, 255).toInt();
   }
 
   int _toQuantizedInt8(double normalizedValue) {
+    final mode = _modelConfig.normalization.replaceAll(' ', '').trim();
     if (_inputScale > 0) {
       final q = (normalizedValue / _inputScale + _inputZeroPoint).round();
       return q.clamp(-128, 127).toInt();
+    }
+
+    if (mode == '[0,255]' ||
+        mode == '[0,255.0]' ||
+        mode == 'raw' ||
+        mode == 'none') {
+      return (normalizedValue - 128.0).round().clamp(-128, 127).toInt();
+    }
+
+    if (mode == '[0,1]') {
+      return (normalizedValue * 255.0 - 128.0).round().clamp(-128, 127).toInt();
     }
 
     return (normalizedValue * 127.0).round().clamp(-128, 127).toInt();
@@ -346,24 +371,22 @@ class ModelConfig {
 
   factory ModelConfig.defaults() {
     return const ModelConfig(
-      modelVersion: 'lettuce_v2',
+      modelVersion: 'lettuce_v2_npk',
       inputSize: 224,
       normalization: '[-1,1]',
       classThresholds: {
         'healthy': 0.62,
-        'tipburn': 0.58,
-        'nutrient_deficiency': 0.57,
+        'nitrogen_deficiency': 0.58,
+        'phosphorus_deficiency': 0.58,
+        'potassium_deficiency': 0.58,
         'fungal_mildew': 0.61,
-        'pest_damage': 0.55,
-        'physical_damage': 0.56,
       },
       binaryMap: {
         'healthy': _defaultBinaryHealthy,
-        'tipburn': _defaultBinaryUnhealthy,
-        'nutrient_deficiency': _defaultBinaryUnhealthy,
+        'nitrogen_deficiency': _defaultBinaryUnhealthy,
+        'phosphorus_deficiency': _defaultBinaryUnhealthy,
+        'potassium_deficiency': _defaultBinaryUnhealthy,
         'fungal_mildew': _defaultBinaryUnhealthy,
-        'pest_damage': _defaultBinaryUnhealthy,
-        'physical_damage': _defaultBinaryUnhealthy,
       },
     );
   }

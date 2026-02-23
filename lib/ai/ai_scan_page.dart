@@ -139,8 +139,8 @@ class _AiScanPageState extends State<AiScanPage> {
         _topK = result.topK;
 
         _status = result.isUncertain
-            ? 'Uncertain (${result.predictedClass})'
-            : result.predictedClass;
+            ? 'Uncertain (${_displayClassLabel(result.predictedClass)})'
+            : _displayClassLabel(result.predictedClass);
 
         _explanation = _explainClass(result.predictedClass);
         _recommendation = _recommendForClass(
@@ -174,16 +174,14 @@ class _AiScanPageState extends State<AiScanPage> {
     switch (predictedClass.toLowerCase()) {
       case 'healthy':
         return 'Leaf texture and color look healthy for the trained class set.';
-      case 'tipburn':
-        return 'Detected leaf-edge burn pattern consistent with tipburn stress.';
-      case 'nutrient_deficiency':
-        return 'Detected discoloration pattern that may indicate nutrient imbalance.';
+      case 'nitrogen_deficiency':
+        return 'Detected pattern is most consistent with nitrogen deficiency (N) in lettuce.';
+      case 'phosphorus_deficiency':
+        return 'Detected pattern is most consistent with phosphorus deficiency (P) in lettuce.';
+      case 'potassium_deficiency':
+        return 'Detected pattern is most consistent with potassium deficiency (K) in lettuce.';
       case 'fungal_mildew':
-        return 'Detected surface pattern similar to fungal or mildew infection.';
-      case 'pest_damage':
-        return 'Detected marks and tissue loss pattern associated with pest damage.';
-      case 'physical_damage':
-        return 'Detected tears/bruising pattern likely from handling or mechanical damage.';
+        return 'Detected surface pattern is consistent with fungal mildew infection.';
       default:
         return 'Prediction received from AI model.';
     }
@@ -200,19 +198,27 @@ class _AiScanPageState extends State<AiScanPage> {
     switch (predictedClass.toLowerCase()) {
       case 'healthy':
         return 'Maintain stable pH/EC/temperature and continue routine monitoring.';
-      case 'tipburn':
-        return 'Check calcium availability, reduce heat stress, and improve airflow around canopy.';
-      case 'nutrient_deficiency':
-        return 'Review EC and nutrient mix, then inspect new leaves over 24-48 hours for recovery.';
+      case 'nitrogen_deficiency':
+        return 'Increase the N component of your NPK mix gradually, keep pH in target range, and re-check new leaf color in 24-48 hours.';
+      case 'phosphorus_deficiency':
+        return 'Increase the P component of your NPK mix gradually, verify root-zone pH/temperature, and monitor new growth over the next 2 days.';
+      case 'potassium_deficiency':
+        return 'Increase the K component of your NPK mix gradually, check EC stability, and watch leaf-edge recovery on new leaves within 24-48 hours.';
       case 'fungal_mildew':
-        return 'Inspect leaf underside, isolate affected plants, and improve humidity/airflow control.';
-      case 'pest_damage':
-        return 'Inspect both leaf surfaces and nearby plants, then apply integrated pest control actions.';
-      case 'physical_damage':
-        return 'Review handling workflow and tooling; monitor if new growth remains unaffected.';
+        return 'Isolate affected plants, remove heavily infected leaves, lower humidity, improve airflow, and apply an approved antifungal treatment.';
       default:
         return 'Cross-check this prediction with sensor trends before acting.';
     }
+  }
+
+  String _displayClassLabel(String value) {
+    if (value.trim().isEmpty) return '—';
+    final words = value
+        .split('_')
+        .where((w) => w.isNotEmpty)
+        .map((w) => '${w[0].toUpperCase()}${w.substring(1)}')
+        .toList();
+    return words.join(' ');
   }
 
   Future<void> _saveAiScan({
@@ -375,7 +381,7 @@ class _AiScanPageState extends State<AiScanPage> {
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    'Class: ${_predictedClass.isEmpty ? '—' : _predictedClass}',
+                                    'Class: ${_displayClassLabel(_predictedClass)}',
                                   ),
                                   Text(
                                     'Binary: ${_predictedBinary.isEmpty ? '—' : _predictedBinary}',
@@ -450,7 +456,7 @@ class _AiScanPageState extends State<AiScanPage> {
                               const SizedBox(height: 6),
                               ..._topK.map(
                                 (s) => Text(
-                                  '${s.label}: ${(100 * s.score).toStringAsFixed(1)}%',
+                                  '${_displayClassLabel(s.label)}: ${(100 * s.score).toStringAsFixed(1)}%',
                                 ),
                               ),
                             ],

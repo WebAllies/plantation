@@ -11,11 +11,11 @@ void main() {
         "normalization": "[-1,1]",
         "classThresholds": {
           "healthy": 0.62,
-          "tipburn": 0.58
+          "nitrogen_deficiency": 0.58
         },
         "binaryMap": {
           "healthy": "Healthy",
-          "tipburn": "Unhealthy"
+          "nitrogen_deficiency": "Unhealthy"
         }
       }
       ''';
@@ -25,9 +25,9 @@ void main() {
       expect(config.modelVersion, 'lettuce_v2');
       expect(config.inputSize, 224);
       expect(config.thresholdForClass('healthy'), 0.62);
-      expect(config.thresholdForClass('tipburn'), 0.58);
+      expect(config.thresholdForClass('nitrogen_deficiency'), 0.58);
       expect(config.binaryLabelForClass('healthy'), 'Healthy');
-      expect(config.binaryLabelForClass('tipburn'), 'Unhealthy');
+      expect(config.binaryLabelForClass('nitrogen_deficiency'), 'Unhealthy');
     });
 
     test('uses safe defaults for unknown classes', () {

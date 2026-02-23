@@ -56,28 +56,79 @@ def can_stratify(values: Iterable[str]) -> bool:
     return len(counts) > 1 and (counts >= 2).all()
 
 
-def split_by_group(
-    df: pd.DataFrame,
-    group_col: str,
-    label_col: str,
-    split_cfg: Dict,
-    seed: int,
-) -> SplitFrames:
+def _split_ratios(split_cfg: Dict) -> Tuple[float, float, float]:
     train_ratio = float(split_cfg.get("train", 0.70))
     val_ratio = float(split_cfg.get("val", 0.15))
     test_ratio = float(split_cfg.get("test", 0.15))
 
     if not math.isclose(train_ratio + val_ratio + test_ratio, 1.0, abs_tol=1e-6):
         raise ValueError("Split ratios must sum to 1.0")
+    return train_ratio, val_ratio, test_ratio
 
-    grouped = (
-        df.groupby(group_col)[label_col]
-        .agg(lambda s: s.mode().iloc[0] if not s.mode().empty else s.iloc[0])
-        .reset_index()
+
+def _allocate_group_counts(
+    n_groups: int,
+    train_ratio: float,
+    val_ratio: float,
+    test_ratio: float,
+) -> Tuple[int, int, int]:
+    if n_groups <= 0:
+        return 0, 0, 0
+
+    raw = np.array([train_ratio, val_ratio, test_ratio], dtype=np.float64) * float(n_groups)
+    counts = np.floor(raw).astype(np.int32)
+    remainder = int(n_groups - int(counts.sum()))
+
+    if remainder > 0:
+        order = np.argsort(-(raw - counts))
+        for idx in order[:remainder]:
+            counts[idx] += 1
+
+    mins = np.array(
+        [
+            1 if n_groups >= 1 else 0,  # train
+            1 if n_groups >= 3 else 0,  # val
+            1 if n_groups >= 2 else 0,  # test
+        ],
+        dtype=np.int32,
     )
 
+    for i in range(3):
+        while counts[i] < mins[i]:
+            donor = int(np.argmax(counts - mins))
+            if donor == i or counts[donor] <= mins[donor]:
+                break
+            counts[donor] -= 1
+            counts[i] += 1
+
+    return int(counts[0]), int(counts[1]), int(counts[2])
+
+
+def _dominant_group_labels(df: pd.DataFrame, group_col: str, label_col: str) -> pd.DataFrame:
+    grouped = (
+        df.groupby(group_col)[label_col]
+        .agg(
+            dominant_label=lambda s: s.mode().iloc[0] if not s.mode().empty else s.iloc[0],
+            unique_labels=lambda s: int(s.nunique()),
+        )
+        .reset_index()
+    )
+    return grouped
+
+
+def split_by_group_global(
+    df: pd.DataFrame,
+    group_col: str,
+    label_col: str,
+    split_cfg: Dict,
+    seed: int,
+) -> SplitFrames:
+    train_ratio, val_ratio, test_ratio = _split_ratios(split_cfg)
+
+    grouped = _dominant_group_labels(df, group_col=group_col, label_col=label_col)
+
     groups = grouped[group_col].to_numpy()
-    group_labels = grouped[label_col].to_numpy()
+    group_labels = grouped["dominant_label"].to_numpy()
 
     stratify_primary = group_labels if can_stratify(group_labels) else None
 
@@ -108,6 +159,78 @@ def split_by_group(
     return SplitFrames(train=train_df, val=val_df, test=test_df)
 
 
+def split_by_group_per_label(
+    df: pd.DataFrame,
+    group_col: str,
+    label_col: str,
+    split_cfg: Dict,
+    seed: int,
+) -> SplitFrames:
+    train_ratio, val_ratio, test_ratio = _split_ratios(split_cfg)
+
+    grouped = _dominant_group_labels(df, group_col=group_col, label_col=label_col)
+    mixed_groups = grouped[grouped["unique_labels"] > 1]
+    if not mixed_groups.empty:
+        print(
+            "[split] warning: found mixed-label groups; using dominant label per group. "
+            f"mixed_groups={len(mixed_groups)}"
+        )
+
+    rng = np.random.default_rng(seed)
+    train_groups: List[str] = []
+    val_groups: List[str] = []
+    test_groups: List[str] = []
+
+    for label in sorted(grouped["dominant_label"].unique()):
+        label_groups = grouped[grouped["dominant_label"] == label][group_col].astype(str).to_list()
+        if not label_groups:
+            continue
+
+        rng.shuffle(label_groups)
+        n_train, n_val, n_test = _allocate_group_counts(
+            n_groups=len(label_groups),
+            train_ratio=train_ratio,
+            val_ratio=val_ratio,
+            test_ratio=test_ratio,
+        )
+
+        train_groups.extend(label_groups[:n_train])
+        val_groups.extend(label_groups[n_train : n_train + n_val])
+        test_groups.extend(label_groups[n_train + n_val : n_train + n_val + n_test])
+
+    train_df = df[df[group_col].astype(str).isin(set(train_groups))].copy()
+    val_df = df[df[group_col].astype(str).isin(set(val_groups))].copy()
+    test_df = df[df[group_col].astype(str).isin(set(test_groups))].copy()
+
+    return SplitFrames(train=train_df, val=val_df, test=test_df)
+
+
+def split_by_group(
+    df: pd.DataFrame,
+    group_col: str,
+    label_col: str,
+    split_cfg: Dict,
+    seed: int,
+    strategy: str = "per_label_grouped",
+) -> SplitFrames:
+    strategy_norm = strategy.strip().lower().replace("-", "_")
+    if strategy_norm in {"per_label_grouped", "per_class_grouped", "label_grouped"}:
+        return split_by_group_per_label(
+            df=df,
+            group_col=group_col,
+            label_col=label_col,
+            split_cfg=split_cfg,
+            seed=seed,
+        )
+    return split_by_group_global(
+        df=df,
+        group_col=group_col,
+        label_col=label_col,
+        split_cfg=split_cfg,
+        seed=seed,
+    )
+
+
 def resolve_image_path(path_value: str, image_root: Path) -> Path:
     candidate = Path(path_value)
     if candidate.is_absolute():
@@ -126,8 +249,100 @@ def add_image_paths(df: pd.DataFrame, image_col: str, image_root: Path) -> pd.Da
     return out
 
 
+def filter_decodable_images(df: pd.DataFrame) -> pd.DataFrame:
+    keep_mask = []
+    dropped = 0
+
+    for path in df["resolved_path"].astype(str):
+        try:
+            raw = tf.io.read_file(path)
+            _ = tf.image.decode_image(raw, channels=3, expand_animations=False)
+            keep_mask.append(True)
+        except Exception:
+            keep_mask.append(False)
+            dropped += 1
+
+    out = df[keep_mask].copy()
+    if out.empty:
+        raise RuntimeError("No decodable images left after validation")
+
+    if dropped > 0:
+        print(f"[data] dropped {dropped} invalid/corrupt images during decode validation")
+
+    return out
+
+
 def make_label_index(allowed_labels: List[str]) -> Dict[str, int]:
     return {label: i for i, label in enumerate(allowed_labels)}
+
+
+def summarize_split_coverage(
+    splits: SplitFrames,
+    label_col: str,
+    allowed_labels: List[str],
+) -> None:
+    for name, split_df in {
+        "train": splits.train,
+        "val": splits.val,
+        "test": splits.test,
+    }.items():
+        counts = split_df[label_col].value_counts().to_dict()
+        missing = [label for label in allowed_labels if counts.get(label, 0) == 0]
+        summary = ", ".join([f"{label}:{counts.get(label, 0)}" for label in allowed_labels])
+        print(f"[split] {name}: {summary}")
+        if missing:
+            print(f"[split] warning: {name} missing labels: {missing}")
+
+
+def _oversample_target_count(counts: pd.Series, strategy: str) -> int:
+    strategy_norm = strategy.strip().lower()
+    if strategy_norm == "max":
+        return int(counts.max())
+    if strategy_norm == "mean":
+        return int(math.ceil(float(counts.mean())))
+    if strategy_norm in {"p75", "q75"}:
+        return int(math.ceil(float(counts.quantile(0.75))))
+    if strategy_norm in {"p90", "q90"}:
+        return int(math.ceil(float(counts.quantile(0.90))))
+    return int(counts.max())
+
+
+def oversample_train_split(
+    train_df: pd.DataFrame,
+    label_col: str,
+    seed: int,
+    target_strategy: str = "p75",
+    max_multiplier: float = 3.0,
+) -> pd.DataFrame:
+    counts = train_df[label_col].value_counts()
+    if counts.empty or len(counts) <= 1:
+        return train_df
+
+    target = _oversample_target_count(counts, strategy=target_strategy)
+    rng = np.random.default_rng(seed)
+    frames: List[pd.DataFrame] = []
+
+    for label, label_df in train_df.groupby(label_col):
+        current = int(len(label_df))
+        cap = int(math.ceil(current * max_multiplier))
+        desired = max(current, min(target, cap))
+
+        if desired > current:
+            sample_idx = rng.choice(label_df.index.to_numpy(), size=(desired - current), replace=True)
+            frames.append(label_df)
+            frames.append(label_df.loc[sample_idx].copy())
+        else:
+            frames.append(label_df)
+
+    out = pd.concat(frames, axis=0, ignore_index=True)
+    out = out.sample(frac=1.0, random_state=seed).reset_index(drop=True)
+
+    print(
+        "[train] oversample applied: "
+        f"strategy={target_strategy}, max_multiplier={max_multiplier}, "
+        f"samples_before={len(train_df)}, samples_after={len(out)}"
+    )
+    return out
 
 
 def gaussian_blur_3x3(image: tf.Tensor) -> tf.Tensor:
@@ -164,7 +379,8 @@ def make_dataset(
     brightness = float(aug_cfg.get("brightness", 0.0))
     contrast = float(aug_cfg.get("contrast", 0.0))
     blur_probability = float(aug_cfg.get("blur_probability", 0.0))
-    use_flip = bool(aug_cfg.get("flip", True))
+    use_flip_h = bool(aug_cfg.get("flip_horizontal", aug_cfg.get("flip", True)))
+    use_flip_v = bool(aug_cfg.get("flip_vertical", False))
 
     rot_layer = tf.keras.layers.RandomRotation(rotation) if rotation > 0 else None
     zoom_layer = (
@@ -184,8 +400,9 @@ def make_dataset(
     def _augment(image: tf.Tensor, label: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
         x = image
 
-        if use_flip:
+        if use_flip_h:
             x = tf.image.random_flip_left_right(x)
+        if use_flip_v:
             x = tf.image.random_flip_up_down(x)
 
         if rot_layer is not None:
@@ -231,13 +448,6 @@ def build_model(
 ) -> Tuple[tf.keras.Model, tf.keras.Model]:
     inputs = tf.keras.layers.Input(shape=(input_size, input_size, 3), name="input_image")
     x = inputs
-
-    mode = normalization.replace(" ", "")
-    if mode == "[-1,1]":
-        x = tf.keras.layers.Rescaling(1.0 / 127.5, offset=-1.0, name="normalize")(x)
-    elif mode == "[0,1]":
-        x = tf.keras.layers.Rescaling(1.0 / 255.0, name="normalize")(x)
-
     backbone = tf.keras.applications.EfficientNetB0(
         include_top=False,
         weights="imagenet",
@@ -284,17 +494,19 @@ def evaluate_predictions(
     binary_map: Dict[str, str],
 ) -> Dict:
     y_pred = y_prob.argmax(axis=1)
+    class_indices = np.arange(len(label_names))
 
     macro_f1 = float(f1_score(y_true, y_pred, average="macro", zero_division=0))
     report = classification_report(
         y_true,
         y_pred,
+        labels=class_indices,
         target_names=label_names,
         output_dict=True,
         zero_division=0,
     )
 
-    cm = confusion_matrix(y_true, y_pred)
+    cm = confusion_matrix(y_true, y_pred, labels=class_indices)
 
     def to_binary(idx: int) -> str:
         class_name = label_names[idx]
@@ -330,6 +542,8 @@ def main() -> None:
     image_col = data_cfg.get("image_column", "image_path")
     label_col = data_cfg.get("label_column", "label")
     group_col = data_cfg.get("group_column", "captureSessionId")
+    validate_images = bool(data_cfg.get("validate_images", True))
+    split_strategy = data_cfg.get("split_strategy", "per_label_grouped")
 
     allowed_labels = [normalize_label(v) for v in data_cfg.get("allowed_labels", [])]
     if not allowed_labels:
@@ -346,7 +560,21 @@ def main() -> None:
     dropout = float(train_cfg.get("dropout", 0.30))
     label_smoothing = float(train_cfg.get("label_smoothing", 0.05))
     early_stopping_patience = int(train_cfg.get("early_stopping_patience", 6))
-    normalization = cfg.get("model", {}).get("normalization", "[-1,1]")
+    reduce_lr_patience = int(train_cfg.get("reduce_lr_patience", 3))
+    reduce_lr_factor = float(train_cfg.get("reduce_lr_factor", 0.5))
+    reduce_lr_min_lr = float(train_cfg.get("reduce_lr_min_lr", 1e-6))
+    oversample_train = bool(train_cfg.get("oversample_train", True))
+    oversample_target = str(train_cfg.get("oversample_target", "p75"))
+    oversample_max_multiplier = float(train_cfg.get("oversample_max_multiplier", 3.0))
+    normalization_requested = cfg.get("model", {}).get("normalization", "[0,255]")
+    normalization_mode = str(normalization_requested).replace(" ", "").lower()
+    if normalization_mode not in {"[0,255]", "[0,255.0]", "raw", "none"}:
+        print(
+            "[model] warning: EfficientNetB0 in this TensorFlow build already contains "
+            "its own preprocessing. For correctness, forcing model input normalization "
+            "to [0,255]."
+        )
+    normalization = "[0,255]"
 
     run_prefix = out_cfg.get("run_name_prefix", "lettuce_v2")
     run_name = f"{run_prefix}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
@@ -365,7 +593,17 @@ def main() -> None:
         raise RuntimeError("No rows left after filtering to allowed_labels")
 
     df = add_image_paths(df, image_col=image_col, image_root=image_root)
-    splits = split_by_group(df, group_col=group_col, label_col=label_col, split_cfg=data_cfg["split"], seed=seed)
+    if validate_images:
+        df = filter_decodable_images(df)
+    splits = split_by_group(
+        df,
+        group_col=group_col,
+        label_col=label_col,
+        split_cfg=data_cfg["split"],
+        seed=seed,
+        strategy=split_strategy,
+    )
+    summarize_split_coverage(splits, label_col=label_col, allowed_labels=allowed_labels)
 
     label_to_idx = make_label_index(allowed_labels)
     for split_df in (splits.train, splits.val, splits.test):
@@ -378,9 +616,19 @@ def main() -> None:
     }.items():
         split_df.to_csv(run_dir / f"{name}_split.csv", index=False)
 
+    train_frame = splits.train.copy()
+    if oversample_train:
+        train_frame = oversample_train_split(
+            train_frame,
+            label_col=label_col,
+            seed=seed,
+            target_strategy=oversample_target,
+            max_multiplier=oversample_max_multiplier,
+        )
+
     num_classes = len(allowed_labels)
     train_ds = make_dataset(
-        splits.train,
+        train_frame,
         num_classes=num_classes,
         input_size=input_size,
         batch_size=batch_size,
@@ -407,7 +655,7 @@ def main() -> None:
         training=False,
     )
 
-    y_train = splits.train["label_idx"].to_numpy(dtype=np.int32)
+    y_train = train_frame["label_idx"].to_numpy(dtype=np.int32)
     try:
         weights = compute_class_weight(
             class_weight="balanced",
@@ -428,24 +676,33 @@ def main() -> None:
     checkpoint_stage_a = str(run_dir / "best_stage_a.keras")
     checkpoint_stage_b = str(run_dir / "best_stage_b.keras")
 
+    stage_a_callbacks = [
+        tf.keras.callbacks.EarlyStopping(
+            monitor="val_loss",
+            patience=early_stopping_patience,
+            restore_best_weights=True,
+        ),
+        tf.keras.callbacks.ReduceLROnPlateau(
+            monitor="val_loss",
+            factor=reduce_lr_factor,
+            patience=reduce_lr_patience,
+            min_lr=reduce_lr_min_lr,
+            verbose=1,
+        ),
+        tf.keras.callbacks.ModelCheckpoint(
+            filepath=checkpoint_stage_a,
+            monitor="val_loss",
+            save_best_only=True,
+        ),
+    ]
+
     compile_model(model, learning_rate=stage_a_lr, label_smoothing=label_smoothing)
     history_a = model.fit(
         train_ds,
         validation_data=val_ds,
         epochs=stage_a_epochs,
         class_weight=class_weight,
-        callbacks=[
-            tf.keras.callbacks.EarlyStopping(
-                monitor="val_loss",
-                patience=early_stopping_patience,
-                restore_best_weights=True,
-            ),
-            tf.keras.callbacks.ModelCheckpoint(
-                filepath=checkpoint_stage_a,
-                monitor="val_loss",
-                save_best_only=True,
-            ),
-        ],
+        callbacks=stage_a_callbacks,
         verbose=1,
     )
 
@@ -455,23 +712,32 @@ def main() -> None:
     freeze_backbone_except_top_layers(backbone, unfreeze_layers=unfreeze_layers)
     compile_model(model, learning_rate=stage_b_lr, label_smoothing=label_smoothing)
 
+    stage_b_callbacks = [
+        tf.keras.callbacks.EarlyStopping(
+            monitor="val_loss",
+            patience=early_stopping_patience,
+            restore_best_weights=True,
+        ),
+        tf.keras.callbacks.ReduceLROnPlateau(
+            monitor="val_loss",
+            factor=reduce_lr_factor,
+            patience=reduce_lr_patience,
+            min_lr=reduce_lr_min_lr,
+            verbose=1,
+        ),
+        tf.keras.callbacks.ModelCheckpoint(
+            filepath=checkpoint_stage_b,
+            monitor="val_loss",
+            save_best_only=True,
+        ),
+    ]
+
     history_b = model.fit(
         train_ds,
         validation_data=val_ds,
         epochs=stage_b_epochs,
         class_weight=class_weight,
-        callbacks=[
-            tf.keras.callbacks.EarlyStopping(
-                monitor="val_loss",
-                patience=early_stopping_patience,
-                restore_best_weights=True,
-            ),
-            tf.keras.callbacks.ModelCheckpoint(
-                filepath=checkpoint_stage_b,
-                monitor="val_loss",
-                save_best_only=True,
-            ),
-        ],
+        callbacks=stage_b_callbacks,
         verbose=1,
     )
 
@@ -542,6 +808,7 @@ def main() -> None:
     summary = {
         "run_dir": str(run_dir),
         "train_samples": int(len(splits.train)),
+        "train_samples_effective": int(len(train_frame)),
         "val_samples": int(len(splits.val)),
         "test_samples": int(len(splits.test)),
         "macro_f1_test": test_metrics["macro_f1"],

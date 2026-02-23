@@ -21,11 +21,10 @@ class SuperAdminAiReportsPage extends StatefulWidget {
 class _SuperAdminAiReportsPageState extends State<SuperAdminAiReportsPage> {
   static const List<String> _classOptions = [
     'healthy',
-    'tipburn',
-    'nutrient_deficiency',
+    'nitrogen_deficiency',
+    'phosphorus_deficiency',
+    'potassium_deficiency',
     'fungal_mildew',
-    'pest_damage',
-    'physical_damage',
   ];
 
   String? selectedRole;

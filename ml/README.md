@@ -13,6 +13,7 @@ Local training pipeline for lettuce health/disease classification.
 - `ml/migrate_ai_scans_schema.js`: backfill old `ai_scans` docs to new schema
 - `ml/run_pipeline.py`: one-command train -> calibrate -> export -> asset update
 - `ml/init_dataset.py`: create local dataset folder/template CSV
+- `ml/quality_audit.py`: detect corrupt/low-quality/duplicate images and write cleaned metadata
 
 ## 1) Environment
 
@@ -70,6 +71,19 @@ node ml/migrate_ai_scans_schema.js \
 
 ## 3) Train
 
+First build a cleaned metadata file:
+
+```bash
+python ml/quality_audit.py \
+  --metadata dataset/metadata.csv \
+  --image-root dataset/images \
+  --output-report ml/artifacts/quality_report.csv \
+  --output-metadata dataset/metadata.cleaned.csv \
+  --drop-exact-duplicates
+```
+
+Then train:
+
 ```bash
 python ml/train.py --config ml/configs/v1.yaml
 ```
@@ -79,8 +93,11 @@ Outputs are written under `ml/artifacts/<run_name>/`.
 Expected metadata columns in `dataset/metadata.csv`:
 
 - `image_path` (relative path like `healthy/img001.jpg` or absolute path)
-- `label` (one of 6 class names)
+- `label` (one of 5 class names: `healthy`, `nitrogen_deficiency`, `phosphorus_deficiency`, `potassium_deficiency`, `fungal_mildew`)
 - `captureSessionId` (group id to avoid leakage between train/val/test)
+
+By default, `ml/train.py` also validates decodeability and drops corrupt images (`data.validate_images: true`).
+`ml/configs/v1.yaml` is configured to train from `dataset/metadata.cleaned.csv`.
 
 ## 4) Calibrate class thresholds
 

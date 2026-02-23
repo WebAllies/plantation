@@ -9,11 +9,11 @@ from pathlib import Path
 
 DEFAULT_CLASSES = [
     "healthy",
-    "tipburn",
+    "nitrogen_deficiency",
+    "phosphorus_deficiency",
+    "potassium_deficiency",
     "nutrient_deficiency",
     "fungal_mildew",
-    "pest_damage",
-    "physical_damage",
 ]
 
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 from datetime import datetime
@@ -49,9 +50,12 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def run_cmd(cmd: List[str], cwd: Path) -> None:
+def run_cmd(cmd: List[str], cwd: Path, env: Optional[Dict[str, str]] = None) -> None:
     print(f"\n[RUN] {' '.join(cmd)}")
-    subprocess.run(cmd, cwd=str(cwd), check=True)
+    merged_env = os.environ.copy()
+    if env:
+        merged_env.update(env)
+    subprocess.run(cmd, cwd=str(cwd), check=True, env=merged_env)
 
 
 def load_config(path: Path) -> Dict:

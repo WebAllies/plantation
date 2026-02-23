@@ -71,8 +71,36 @@ def representative_data_gen(csv_path: Path, image_col: str, input_size: int) -> 
         yield [image]
 
 
+def make_converter(model: tf.keras.Model) -> tf.lite.TFLiteConverter:
+    if not model.inputs:
+        raise ValueError("Model has no inputs")
+
+    input_shape = list(model.inputs[0].shape)
+    if len(input_shape) < 2:
+        raise ValueError(f"Unexpected input shape: {input_shape}")
+
+    # TFLite export is for on-device single-image inference (batch=1).
+    signature_shape = [1 if dim is None else int(dim) for dim in input_shape]
+    signature_shape[0] = 1
+
+    @tf.function(
+        input_signature=[
+            tf.TensorSpec(
+                shape=signature_shape,
+                dtype=model.inputs[0].dtype,
+                name="input_image",
+            )
+        ]
+    )
+    def serving_fn(x: tf.Tensor) -> tf.Tensor:
+        return model(x, training=False)
+
+    concrete_fn = serving_fn.get_concrete_function()
+    return tf.lite.TFLiteConverter.from_concrete_functions([concrete_fn], model)
+
+
 def export_float16(model: tf.keras.Model, output_path: Path) -> None:
-    converter = tf.lite.TFLiteConverter.from_keras_model(model)
+    converter = make_converter(model)
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
     converter.target_spec.supported_types = [tf.float16]
     tflite_model = converter.convert()
@@ -80,7 +108,7 @@ def export_float16(model: tf.keras.Model, output_path: Path) -> None:
 
 
 def export_int8(model: tf.keras.Model, output_path: Path, rep_gen: Iterable[List[np.ndarray]]) -> None:
-    converter = tf.lite.TFLiteConverter.from_keras_model(model)
+    converter = make_converter(model)
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
     converter.representative_dataset = lambda: rep_gen
     converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
@@ -219,7 +247,7 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     labels = load_labels(labels_path)
-    model = tf.keras.models.load_model(model_path)
+    model = tf.keras.models.load_model(model_path, compile=False)
 
     float16_path = output_dir / "lettuce_model_float16.tflite"
     int8_path = output_dir / "lettuce_model_int8.tflite"
