@@ -192,7 +192,7 @@ class _SuperAdminAiReportsPageState extends State<SuperAdminAiReportsPage> {
       }),
     ];
 
-    final csvStr = const ListToCsvConverter().convert(rows);
+    final csvStr = const CsvEncoder().convert(rows);
     final dir = await getApplicationDocumentsDirectory();
     final file = File(
       '${dir.path}/ai_scan_report_${DateTime.now().millisecondsSinceEpoch}.csv',

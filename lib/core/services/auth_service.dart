@@ -6,8 +6,14 @@ import 'package:firebase_core/firebase_core.dart';
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  static final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+  static Future<void>? _googleSignInInitFuture;
 
   static const String superAdminEmail = "superadmin@iot.com";
+
+  Future<void> _ensureGoogleSignInInitialized() {
+    return _googleSignInInitFuture ??= _googleSignIn.initialize();
+  }
 
   Future<UserCredential> signInEmail(String email, String password) async {
     final cred = await _auth.signInWithEmailAndPassword(
@@ -81,15 +87,17 @@ class AuthService {
 
 
   Future<UserCredential> signInGoogle() async {
-    final googleUser = await GoogleSignIn().signIn();
-    if (googleUser == null) {
-      throw Exception("Google sign-in canceled");
-    }
+    await _ensureGoogleSignInInitialized();
+
+    final googleUser = await _googleSignIn.authenticate();
 
     final googleAuth = await googleUser.authentication;
+    if (googleAuth.idToken == null || googleAuth.idToken!.isEmpty) {
+      throw Exception("Google sign-in failed: missing ID token");
+    }
+
     final credential = GoogleAuthProvider.credential(
       idToken: googleAuth.idToken,
-      accessToken: googleAuth.accessToken,
     );
 
     final cred = await _auth.signInWithCredential(credential);
@@ -98,7 +106,10 @@ class AuthService {
   }
 
   Future<void> signOut() async {
-    try { await GoogleSignIn().signOut(); } catch (_) {}
+    try {
+      await _ensureGoogleSignInInitialized();
+      await _googleSignIn.signOut();
+    } catch (_) {}
     await _auth.signOut();
   }
 
