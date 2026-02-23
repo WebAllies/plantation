@@ -1,44 +1,84 @@
-# Firebase Functions (MQTT + Alerts + Automation)
+# Firebase Functions
 
-This folder contains backend functions for:
-
-- issuing short-lived MQTT credentials to authenticated app users
-- evaluating device telemetry against sensor thresholds
-- writing alert state/history and optional low-TDS automation commands
-- cleaning up old alerts (3-day retention)
-
-## Deploy
-
-1. Install dependencies:
-   `npm install`
-2. Configure non-secret params in `functions/.env`:
-   - `MQTT_BROKER_URL=wss://YOUR_CLUSTER_HOST.s1.eu.hivemq.cloud:8884/mqtt`
-   - `MQTT_WS_PATH=/mqtt`
-   - `MQTT_USE_TLS=true`
-   - `MQTT_USE_WEBSOCKET=true`
-   - `MQTT_USERNAME_STATIC=YOUR_HIVEMQ_APP_USERNAME`
-   - `MQTT_PASSWORD_STATIC=YOUR_HIVEMQ_APP_PASSWORD`
-   - `MQTT_USERNAME_PREFIX=app`
-3. Deploy:
-   `npm run deploy`
+Backend services for MQTT credentials, alert evaluation, automation commands, and cleanup jobs.
 
 ## Exported Functions
 
 - `issueMqttCredentials` (callable)
-  - returns broker/auth details for app MQTT subscription
-- `evaluateDeviceAlerts` (Firestore trigger on `devices/{deviceId}`)
-  - loads global + override thresholds
-  - evaluates metrics (`temperature`, `ph`, `waterLevel`, `tds`)
-  - writes `devices/{deviceId}/alert_state/current`
-  - appends transition events to `devices/{deviceId}/alerts`
-  - performs low-TDS auto-dose command flow using `pump` commands
-- `cleanupOldAlerts` (scheduled every 24 hours)
-  - deletes `alerts` docs older than 3 days
+  - Returns broker connection/auth payload for app MQTT subscription.
+- `evaluateDeviceAlerts` (Firestore trigger)
+  - Trigger: writes to `devices/{deviceId}`
+  - Evaluates sensor thresholds and writes alert state/history.
+  - Handles low-TDS automation command lifecycle.
+- `recomputeAlertsOnGlobalThresholdsWrite` (Firestore trigger)
+  - Trigger: writes to `settings/sensors`
+  - Recomputes alert state for all devices after global settings update.
+- `recomputeAlertsOnDeviceOverrideWrite` (Firestore trigger)
+  - Trigger: writes to `devices/{deviceId}/configs/sensors`
+  - Recomputes alert state for that device after override changes.
+- `cleanupOldAlerts` (scheduled)
+  - Deletes `devices/{deviceId}/alerts` docs older than retention window.
 
-## Firestore Data Paths Used
+## Runtime + Dependencies
+
+- Node.js: `20` (see `functions/package.json`)
+- Main entry: `functions/index.js`
+
+Install dependencies:
+
+```bash
+cd functions
+npm install
+cd ..
+```
+
+## Configuration
+
+Create `functions/.env` with MQTT params:
+
+```env
+MQTT_BROKER_URL=wss://YOUR_CLUSTER_HOST.s1.eu.hivemq.cloud:8884/mqtt
+MQTT_BROKER_HOST=YOUR_CLUSTER_HOST.s1.eu.hivemq.cloud
+MQTT_BROKER_PORT=8884
+MQTT_WS_PATH=/mqtt
+MQTT_USE_TLS=true
+MQTT_USE_WEBSOCKET=true
+
+MQTT_USERNAME_STATIC=YOUR_HIVEMQ_APP_USERNAME
+MQTT_PASSWORD_STATIC=YOUR_HIVEMQ_APP_PASSWORD
+MQTT_USERNAME_PREFIX=app
+MQTT_JWT_SECRET=
+```
+
+Required for broker connection/auth:
+- `MQTT_BROKER_URL` or (`MQTT_BROKER_HOST` + `MQTT_BROKER_PORT`)
+- `MQTT_USERNAME_STATIC`
+- `MQTT_PASSWORD_STATIC`
+
+## Deploy
+
+From repo root:
+
+```bash
+firebase deploy --only functions --project <project-id>
+```
+
+Deploy with rules at the same time:
+
+```bash
+firebase deploy --only functions,firestore:rules,storage --project <project-id>
+```
+
+## Local Emulator
+
+```bash
+cd functions
+npm run serve
+```
+
+## Firestore Paths Used
 
 Read:
-
 - `settings/sensors`
 - `devices/{deviceId}`
 - `devices/{deviceId}/configs/sensors`
@@ -46,61 +86,30 @@ Read:
 - `devices/{deviceId}/automation/tds`
 
 Write:
-
 - `devices/{deviceId}/alert_state/current`
 - `devices/{deviceId}/alerts/{alertId}`
 - `devices/{deviceId}/automation/tds`
-- `devices/{deviceId}/commands/{commandId}` (`type: "pump"`)
+- `devices/{deviceId}/commands/{commandId}`
 
-## Alert and Automation Notes
+## Expected Device Metrics in `devices/{deviceId}`
 
-- Alert transition events are written only on state changes.
-- Auto-dose is low-TDS only:
-  - starts when TDS is below min and automation is enabled
-  - stops when TDS reaches configured max (`stopTarget: tds_max`) or timeout
-- Default timeout is 300 seconds.
-- Cleanup keeps only 3 days of alert history.
+- `temperatureC`
+- `ph`
+- `waterLevelPct`
+- `tdsPpm`
 
-## Quick Verification (After Deploy)
+## Alert / Automation Behavior
 
-1. Ensure `settings/sensors` exists (or save from app Settings -> Sensors).
-2. Confirm device doc `devices/{deviceId}` is receiving telemetry fields:
-   - `temperatureC`, `ph`, `waterLevelPct`, `tdsPpm`
-3. Trigger a breach (for example low TDS) and confirm:
-   - `devices/{deviceId}/alert_state/current.activeMetrics` updates
-   - new docs appear in `devices/{deviceId}/alerts`
-4. If low-TDS auto-dose is enabled, confirm:
-   - pending command is written to `devices/{deviceId}/commands` with `type: pump`
-   - `devices/{deviceId}/automation/tds.active` toggles true/false through lifecycle
-5. After recovery/normalization, confirm:
-   - recovery/completion events are appended to `devices/{deviceId}/alerts`
+- Threshold source can be global or per-device override.
+- Transition-only alert history events are appended.
+- Low-TDS automation can issue pump commands when enabled.
+- Alert history retention cleanup runs on schedule.
 
-## Required Params
+## Post-Deploy Verification
 
-- `MQTT_BROKER_URL` or (`MQTT_BROKER_HOST` + `MQTT_BROKER_PORT`)
-- `MQTT_PASSWORD_STATIC` for username/password brokers like HiveMQ
-- `MQTT_USERNAME_STATIC` for fixed broker username
-- Optional: `MQTT_JWT_SECRET` if your broker validates JWT tokens
-
-Optional:
-
-- `MQTT_WS_PATH` (default `/mqtt`)
-- `MQTT_USE_TLS` (default `true`)
-- `MQTT_USE_WEBSOCKET` (default `true`)
-- `MQTT_USERNAME_PREFIX` (default `app`)
-
-## HiveMQ Cloud Values
-
-- TLS MQTT for ESP/device publish: port `8883`
-- Secure WebSocket for Flutter app: port `8884`
-- WebSocket path: `/mqtt`
-- Username/password: use HiveMQ credentials created in HiveMQ console
-
-Recommended split:
-
-- Device credential:
-  - publish: `plantation/<deviceId>/telemetry/live`
-  - publish retained: `plantation/<deviceId>/status`
-- App credential:
-  - subscribe: `plantation/+/telemetry/live` (or per-device if stricter)
-  - subscribe: `plantation/+/status`
+1. Confirm `settings/sensors` exists.
+2. Confirm telemetry updates in `devices/{deviceId}`.
+3. Force a breach and check:
+   - `devices/{deviceId}/alert_state/current`
+   - `devices/{deviceId}/alerts`
+4. If low-TDS automation enabled, confirm command writes in `devices/{deviceId}/commands`.

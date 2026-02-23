@@ -1,21 +1,32 @@
 # Lettuce ML Workspace
 
-Local training pipeline for lettuce health/disease classification.
+This folder contains the local training and export pipeline for the lettuce classifier used by the app.
 
-## Files
+## Current Class Taxonomy
 
-- `ml/configs/v1.yaml`: training/data split config
-- `ml/train.py`: grouped split training (EfficientNetB0)
-- `ml/evaluate.py`: standalone evaluation script
-- `ml/calibrate_thresholds.py`: per-class threshold calibration
-- `ml/export_tflite.py`: float16/int8 export + selection logic
+- `healthy`
+- `nitrogen_deficiency`
+- `phosphorus_deficiency`
+- `potassium_deficiency`
+- `fungal_mildew`
+
+Binary mapping in app/reporting:
+- `healthy -> Healthy`
+- all others -> `Unhealthy`
+
+## Key Files
+
+- `ml/configs/v1.yaml`: data/training config
+- `ml/train.py`: train Keras model and save run artifacts
+- `ml/calibrate_thresholds.py`: per-class threshold tuning from validation predictions
+- `ml/export_tflite.py`: export float16/int8 and choose shipping variant
+- `ml/run_pipeline.py`: one-command train -> calibrate -> export -> copy assets
+- `ml/quality_audit.py`: remove corrupt/low-quality/duplicate images
+- `ml/evaluate.py`: standalone evaluation
 - `ml/export_verified_dataset.js`: export verified scans from Firestore + Storage
-- `ml/migrate_ai_scans_schema.js`: backfill old `ai_scans` docs to new schema
-- `ml/run_pipeline.py`: one-command train -> calibrate -> export -> asset update
-- `ml/init_dataset.py`: create local dataset folder/template CSV
-- `ml/quality_audit.py`: detect corrupt/low-quality/duplicate images and write cleaned metadata
+- `ml/migrate_ai_scans_schema.js`: backfill old AI scan schema
 
-## 1) Environment
+## Environment Setup
 
 ```bash
 python -m venv ml/.venv
@@ -23,55 +34,52 @@ source ml/.venv/bin/activate
 pip install -r ml/requirements.txt
 ```
 
-If TensorFlow does not detect GPU in WSL/Linux, reinstall with CUDA extras:
+Optional GPU (if supported by your system):
 
 ```bash
 pip install --upgrade "tensorflow[and-cuda]>=2.14,<2.17"
 ```
 
-## 2) Export verified dataset from production
+## Dataset Structure
 
-```bash
-node ml/export_verified_dataset.js \
-  --project iotaquaapp \
-  --bucket iotaquaapp.firebasestorage.app \
-  --output dataset \
-  --credentials /path/to/service-account.json
-```
-
-This creates:
+Expected layout:
 
 - `dataset/images/<label>/*.jpg`
 - `dataset/metadata.csv`
 
-If you want to start manually (before export), initialize dataset structure:
+Required columns in metadata:
+- `image_path`: relative path from `dataset/images` or absolute path
+- `label`: one of the 5 labels above
+- `captureSessionId`: group id used to avoid split leakage
 
-```bash
-python ml/init_dataset.py --output dataset
+Example row:
+
+```csv
+image_path,label,captureSessionId
+nitrogen_deficiency/N_001.jpg,nitrogen_deficiency,nitrogen_s003
 ```
 
-## 2.5) Backfill old AI scan documents (recommended once)
-
-Dry run:
+## Build Dataset From Verified Production Scans
 
 ```bash
-node ml/migrate_ai_scans_schema.js \
-  --project iotaquaapp \
-  --credentials /path/to/service-account.json \
-  --dry-run
-```
-
-Apply:
-
-```bash
-node ml/migrate_ai_scans_schema.js \
-  --project iotaquaapp \
+node ml/export_verified_dataset.js \
+  --project <firebase-project-id> \
+  --bucket <storage-bucket> \
+  --output dataset \
   --credentials /path/to/service-account.json
 ```
 
-## 3) Train
+Optional schema migration for old docs:
 
-First build a cleaned metadata file:
+```bash
+node ml/migrate_ai_scans_schema.js \
+  --project <firebase-project-id> \
+  --credentials /path/to/service-account.json
+```
+
+## Training Flow
+
+1. Quality audit (recommended every run):
 
 ```bash
 python ml/quality_audit.py \
@@ -82,24 +90,13 @@ python ml/quality_audit.py \
   --drop-exact-duplicates
 ```
 
-Then train:
+2. Train:
 
 ```bash
 python ml/train.py --config ml/configs/v1.yaml
 ```
 
-Outputs are written under `ml/artifacts/<run_name>/`.
-
-Expected metadata columns in `dataset/metadata.csv`:
-
-- `image_path` (relative path like `healthy/img001.jpg` or absolute path)
-- `label` (one of 5 class names: `healthy`, `nitrogen_deficiency`, `phosphorus_deficiency`, `potassium_deficiency`, `fungal_mildew`)
-- `captureSessionId` (group id to avoid leakage between train/val/test)
-
-By default, `ml/train.py` also validates decodeability and drops corrupt images (`data.validate_images: true`).
-`ml/configs/v1.yaml` is configured to train from `dataset/metadata.cleaned.csv`.
-
-## 4) Calibrate class thresholds
+3. Calibrate thresholds:
 
 ```bash
 python ml/calibrate_thresholds.py \
@@ -108,7 +105,7 @@ python ml/calibrate_thresholds.py \
   --output ml/artifacts/<run>/model_config.calibrated.json
 ```
 
-## 5) Export TFLite and select shipping variant
+4. Export TFLite:
 
 ```bash
 python ml/export_tflite.py \
@@ -120,32 +117,45 @@ python ml/export_tflite.py \
   --ship-path assets/models/lettuce_model.tflite
 ```
 
-The script chooses `int8` only when:
-
-- macro-F1 drop vs float16 <= `0.015`
-- int8 latency <= `250 ms`
-
-Otherwise it ships float16.
-
-## 6) One-command full pipeline
-
-After dataset is ready, run:
+## One-Command Pipeline
 
 ```bash
 python ml/run_pipeline.py --config ml/configs/v1.yaml --python python
 ```
 
-This does:
-
-1. `train.py`
-2. threshold calibration
-3. TFLite export + int8/float16 selection
-4. updates:
+Pipeline steps:
+1. Train
+2. Threshold calibration
+3. TFLite export + variant selection
+4. Asset update:
    - `assets/models/lettuce_model.tflite`
    - `assets/models/labels.txt`
    - `assets/models/model_config.json`
 
-## Notes
+## Run Outputs
 
-- Firestore export/migration scripts require Google credentials (service account JSON or ADC).
-- If `tf.config.list_physical_devices('GPU')` is empty, training will run on CPU.
+Each run creates `ml/artifacts/<run_name>/` containing:
+- `model_final.keras`
+- `summary.json`
+- `metrics.json`
+- `history.json`
+- `train_split.csv`, `val_split.csv`, `test_split.csv`
+- `val_predictions.npz`, `test_predictions.npz`
+- `model_config.template.json`, `model_config.calibrated.json`
+- `tflite/` (export artifacts + `tflite_export_summary.json`)
+
+## Accuracy Notes
+
+- The biggest practical gains usually come from better data, not larger model changes.
+- Keep class balance and session diversity high.
+- Avoid mixing near-duplicate images across train/val/test.
+- Keep label quality strict (2-pass review if possible).
+
+## Troubleshooting
+
+- If training is very slow, confirm whether GPU is available.
+- If model collapses to one class, check:
+  - class distribution
+  - label correctness
+  - normalization consistency between training and inference
+- If int8 accuracy drops too much, ship float16.
