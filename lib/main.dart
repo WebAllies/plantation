@@ -3,7 +3,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 
 import 'core/device/device_selection_controller.dart';
-import 'firebase_options.dart';
+import 'firebase_bootstrap.dart';
+import 'firebase_environment.dart';
 
 // Theme controller
 import 'core/theme/theme_controller.dart';
@@ -16,7 +17,7 @@ final ThemeController themeController = ThemeController();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp(options: FirebaseBootstrap.options);
 
   await themeController.load();
 
@@ -35,7 +36,9 @@ class MyApp extends StatelessWidget {
         builder: (context, _) {
           return MaterialApp(
             debugShowCheckedModeBanner: false,
-            title: "AquaFarm",
+            title: FirebaseEnvironmentConfig.isStaging
+                ? "AquaFarm (Staging)"
+                : "AquaFarm",
             themeMode: themeController.mode,
             theme: ThemeData(useMaterial3: true, brightness: Brightness.light),
             darkTheme: ThemeData(

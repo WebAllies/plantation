@@ -56,10 +56,10 @@ npm install
 cd ..
 ```
 
-3. Configure Firebase for this app (Android/Web/others as needed):
+3. Configure Firebase for production (safe output path):
 
 ```bash
-flutterfire configure
+flutterfire configure --project iotaquaapp --out lib/firebase_options_production.dart
 ```
 
 4. Configure Functions env file:
@@ -92,16 +92,52 @@ firebase deploy --only functions,firestore:rules,storage --project <your-project
 flutter run
 ```
 
+## Firebase Environments (Production + Staging)
+
+This repo now uses separate files so staging cannot overwrite production config:
+
+- Production: `lib/firebase_options_production.dart`
+- Staging: `lib/firebase_options_staging.dart`
+- Selector: `lib/firebase_bootstrap.dart`
+- Environment flag: `--dart-define=FIREBASE_ENV=production|staging`
+- Legacy default output file `lib/firebase_options.dart` is no longer used by `main.dart`.
+
+Generate/update staging config:
+
+```bash
+flutterfire configure --project iotaquaapp-staging --out lib/firebase_options_staging.dart
+```
+
+Generate/update production config:
+
+```bash
+flutterfire configure --project iotaquaapp --out lib/firebase_options_production.dart
+```
+
+Run production:
+
+```bash
+flutter run --dart-define=FIREBASE_ENV=production
+```
+
+Run staging:
+
+```bash
+flutter run --dart-define=FIREBASE_ENV=staging
+```
+
+If `FIREBASE_ENV` is omitted, app defaults to production.
+
 ## Firebase Staging Workflow
 
 Use this before production releases.
 
 1. Create staging project (example: `iotaquaapp-staging`)
 2. Register Android app with same package name
-3. Reconfigure FlutterFire for staging:
+3. Generate staging options file:
 
 ```bash
-flutterfire configure --project iotaquaapp-staging
+flutterfire configure --project iotaquaapp-staging --out lib/firebase_options_staging.dart
 ```
 
 4. Add CLI aliases:
@@ -170,4 +206,4 @@ AI scan documents include:
 ## Notes
 
 - If TensorFlow cannot load CUDA, ML training runs on CPU.
-- In this repo state, Flutter Firebase config is currently pointed to project `iotaquaapp` unless reconfigured.
+- App environment is selected by `FIREBASE_ENV` (`production` default, `staging` optional).
