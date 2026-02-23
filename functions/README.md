@@ -1,28 +1,42 @@
-# Firebase Functions
+# Firebase Functions (Backend)
 
-Backend services for MQTT credentials, alert evaluation, automation commands, and cleanup jobs.
+This folder contains Firebase Cloud Functions (Gen2) for MQTT credential issuance, sensor alert evaluation, and automation workflows.
 
-## Exported Functions
-
-- `issueMqttCredentials` (callable)
-  - Returns broker connection/auth payload for app MQTT subscription.
+## Functions In This Codebase
+- `issueMqttCredentials` (callable HTTPS)
+  - Returns MQTT broker connection/auth payload for app clients.
 - `evaluateDeviceAlerts` (Firestore trigger)
-  - Trigger: writes to `devices/{deviceId}`
-  - Evaluates sensor thresholds and writes alert state/history.
-  - Handles low-TDS automation command lifecycle.
+  - Trigger: writes on `devices/{deviceId}`
+  - Evaluates sensor thresholds and updates alert state/history.
 - `recomputeAlertsOnGlobalThresholdsWrite` (Firestore trigger)
-  - Trigger: writes to `settings/sensors`
-  - Recomputes alert state for all devices after global settings update.
+  - Trigger: writes on `settings/sensors`
+  - Recomputes alerts for all devices after global threshold changes.
 - `recomputeAlertsOnDeviceOverrideWrite` (Firestore trigger)
-  - Trigger: writes to `devices/{deviceId}/configs/sensors`
-  - Recomputes alert state for that device after override changes.
+  - Trigger: writes on `devices/{deviceId}/configs/sensors`
+  - Recomputes alerts for one device after override changes.
 - `cleanupOldAlerts` (scheduled)
-  - Deletes `devices/{deviceId}/alerts` docs older than retention window.
+  - Deletes old alert history docs.
 
-## Runtime + Dependencies
+Global options from code:
+- Region: `us-central1`
+- Max instances: `10`
 
-- Node.js: `20` (see `functions/package.json`)
-- Main entry: `functions/index.js`
+Source file:
+- `functions/index.js`
+
+## Runtime And Versions
+- Node.js runtime: `20` (`functions/package.json`)
+- Firebase Functions SDK: `^5.1.1`
+- Firebase Admin SDK: `^12.7.0`
+
+Note from Firebase CLI:
+- Node 20 deprecation starts April 30, 2026, with decommission on October 30, 2026.
+- Plan runtime upgrade to Node 22 before those dates.
+
+## Prerequisites
+From project root machine:
+- `firebase` CLI available (`firebase --version`)
+- Node.js 20+ available (`node --version`)
 
 Install dependencies:
 
@@ -32,9 +46,10 @@ npm install
 cd ..
 ```
 
-## Configuration
+## Environment Variables
+Functions use parameterized env values (defined in code via `defineString`).
 
-Create `functions/.env` with MQTT params:
+Create base file: `functions/.env`
 
 ```env
 MQTT_BROKER_URL=wss://YOUR_CLUSTER_HOST.s1.eu.hivemq.cloud:8884/mqtt
@@ -50,66 +65,119 @@ MQTT_USERNAME_PREFIX=app
 MQTT_JWT_SECRET=
 ```
 
-Required for broker connection/auth:
-- `MQTT_BROKER_URL` or (`MQTT_BROKER_HOST` + `MQTT_BROKER_PORT`)
-- `MQTT_USERNAME_STATIC`
+Variables read by functions:
+- `MQTT_BROKER_URL`
+- `MQTT_BROKER_HOST`
+- `MQTT_BROKER_PORT`
+- `MQTT_WS_PATH`
+- `MQTT_USE_TLS`
+- `MQTT_USE_WEBSOCKET`
+- `MQTT_JWT_SECRET`
 - `MQTT_PASSWORD_STATIC`
+- `MQTT_USERNAME_STATIC`
+- `MQTT_USERNAME_PREFIX`
 
-## Deploy
+During deploy, Firebase may create per-project files automatically:
+- `functions/.env.<project-id>`
 
-From repo root:
+Use these to keep staging and production values separate.
 
-```bash
-firebase deploy --only functions --project <project-id>
-```
+## Deploy Commands
+Run from repository root.
 
-Deploy with rules at the same time:
-
-```bash
-firebase deploy --only functions,firestore:rules,storage --project <project-id>
-```
-
-## Local Emulator
+Deploy functions only:
 
 ```bash
-cd functions
-npm run serve
+npx firebase-tools deploy --only "functions" --project <project-id>
 ```
 
-## Firestore Paths Used
+Deploy functions + Firestore rules + Storage rules:
 
-Read:
+```bash
+npx firebase-tools deploy --only "functions,firestore:rules,storage" --project <project-id>
+```
+
+PowerShell requirement:
+- Keep comma-separated `--only` list inside quotes.
+
+Deploy specific functions only:
+
+```bash
+npx firebase-tools deploy --only "functions:evaluateDeviceAlerts,functions:recomputeAlertsOnGlobalThresholdsWrite,functions:recomputeAlertsOnDeviceOverrideWrite" --project <project-id>
+```
+
+## First Gen2 Deploy: Common Eventarc Error
+If this project has never deployed Gen2 functions before, you may get:
+- Eventarc Service Agent permission errors (HTTP 400 validation failure)
+
+Fix:
+1. Wait 3-10 minutes for API/service-agent IAM propagation.
+2. Re-run deploy for failed functions only.
+
+This is normal on first-time setup.
+
+## Firestore Paths Used By Functions
+Read paths:
 - `settings/sensors`
 - `devices/{deviceId}`
 - `devices/{deviceId}/configs/sensors`
 - `devices/{deviceId}/alert_state/current`
 - `devices/{deviceId}/automation/tds`
 
-Write:
+Write paths:
 - `devices/{deviceId}/alert_state/current`
 - `devices/{deviceId}/alerts/{alertId}`
 - `devices/{deviceId}/automation/tds`
 - `devices/{deviceId}/commands/{commandId}`
 
-## Expected Device Metrics in `devices/{deviceId}`
-
+Expected telemetry fields in `devices/{deviceId}`:
 - `temperatureC`
 - `ph`
 - `waterLevelPct`
 - `tdsPpm`
 
-## Alert / Automation Behavior
-
-- Threshold source can be global or per-device override.
-- Transition-only alert history events are appended.
-- Low-TDS automation can issue pump commands when enabled.
-- Alert history retention cleanup runs on schedule.
-
 ## Post-Deploy Verification
-
-1. Confirm `settings/sensors` exists.
-2. Confirm telemetry updates in `devices/{deviceId}`.
-3. Force a breach and check:
+1. Confirm deploy succeeded in Firebase Console -> Functions.
+2. Confirm `settings/sensors` exists in Firestore.
+3. Write/update a device document in `devices/{deviceId}`.
+4. Verify function updates:
    - `devices/{deviceId}/alert_state/current`
-   - `devices/{deviceId}/alerts`
-4. If low-TDS automation enabled, confirm command writes in `devices/{deviceId}/commands`.
+   - `devices/{deviceId}/alerts/*`
+5. If low-TDS automation is enabled, verify command writes:
+   - `devices/{deviceId}/commands/*`
+6. Confirm scheduled cleanup function exists and is enabled.
+
+## Local Emulator (Optional)
+From `functions/`:
+
+```bash
+npm run serve
+```
+
+Or from root:
+
+```bash
+npx firebase-tools emulators:start --only functions
+```
+
+## Troubleshooting
+
+`firebase: not recognized`
+- Install CLI: `npm install -g firebase-tools`
+- If still failing, use `npx firebase-tools ...`
+- Add npm global bin to PATH on Windows (`%APPDATA%\\npm`).
+
+Deploy prompts for env values every time
+- Ensure `functions/.env.<project-id>` exists and has values.
+- Commit policy: keep env files out of git (already ignored).
+
+`functions: package.json indicates outdated firebase-functions`
+- Current code works on `^5.1.1`, but plan an upgrade window.
+- Test in staging before upgrading major SDK versions.
+
+Need to remove a function
+
+```bash
+npx firebase-tools functions:delete <functionName> --region us-central1 --project <project-id>
+```
+

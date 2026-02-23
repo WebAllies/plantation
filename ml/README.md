@@ -1,85 +1,116 @@
 # Lettuce ML Workspace
 
-This folder contains the local training and export pipeline for the lettuce classifier used by the app.
+This folder contains the local training pipeline that produces the on-device TFLite model used by the app.
 
-## Current Class Taxonomy
+## Goal
+Train a high-accuracy lettuce classifier locally (CPU/GPU), calibrate confidence thresholds, export TFLite, and copy final assets into `assets/models/`.
 
+## Current Label Taxonomy (5 Classes)
 - `healthy`
 - `nitrogen_deficiency`
 - `phosphorus_deficiency`
 - `potassium_deficiency`
 - `fungal_mildew`
 
-Binary mapping in app/reporting:
+Binary compatibility used by app:
 - `healthy -> Healthy`
-- all others -> `Unhealthy`
+- others -> `Unhealthy`
 
-## Key Files
+## Pipeline Files
+- `ml/configs/v1.yaml`: training config and split rules
+- `ml/train.py`: model training + evaluation artifacts
+- `ml/calibrate_thresholds.py`: per-class threshold search on validation outputs
+- `ml/export_tflite.py`: float16/int8 export + variant selection
+- `ml/run_pipeline.py`: train -> calibrate -> export -> copy assets
+- `ml/quality_audit.py`: remove bad/corrupt/duplicate images
+- `ml/evaluate.py`: additional evaluation script
+- `ml/init_dataset.py`: initialize dataset folders + metadata template
+- `ml/export_verified_dataset.js`: export verified images from Firebase for retraining
+- `ml/migrate_ai_scans_schema.js`: migrate old scan docs to new schema
 
-- `ml/configs/v1.yaml`: data/training config
-- `ml/train.py`: train Keras model and save run artifacts
-- `ml/calibrate_thresholds.py`: per-class threshold tuning from validation predictions
-- `ml/export_tflite.py`: export float16/int8 and choose shipping variant
-- `ml/run_pipeline.py`: one-command train -> calibrate -> export -> copy assets
-- `ml/quality_audit.py`: remove corrupt/low-quality/duplicate images
-- `ml/evaluate.py`: standalone evaluation
-- `ml/export_verified_dataset.js`: export verified scans from Firestore + Storage
-- `ml/migrate_ai_scans_schema.js`: backfill old AI scan schema
+## Recommended Training Environment
+- Python 3.10+
+- NVIDIA GPU (optional but strongly recommended)
+- CUDA-compatible TensorFlow build if using GPU
 
-## Environment Setup
+Create virtual environment:
 
 ```bash
 python -m venv ml/.venv
+# Linux/macOS
 source ml/.venv/bin/activate
+# Windows PowerShell
+# .\\ml\\.venv\\Scripts\\Activate.ps1
 pip install -r ml/requirements.txt
 ```
 
-Optional GPU (if supported by your system):
+Optional GPU TensorFlow install:
 
 ```bash
 pip install --upgrade "tensorflow[and-cuda]>=2.14,<2.17"
 ```
 
-## Dataset Structure
+Check GPU visibility:
 
-Expected layout:
+```bash
+python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
+```
 
-- `dataset/images/<label>/*.jpg`
-- `dataset/metadata.csv`
+## Dataset Location And Structure
+`dataset/` is git-ignored by default.
 
-Required columns in metadata:
-- `image_path`: relative path from `dataset/images` or absolute path
+Expected structure:
+
+```text
+dataset/
+  images/
+    healthy/
+    nitrogen_deficiency/
+    phosphorus_deficiency/
+    potassium_deficiency/
+    fungal_mildew/
+  metadata.csv
+```
+
+Initialize structure:
+
+```bash
+python ml/init_dataset.py --output dataset
+```
+
+## Metadata Format
+`metadata.csv` requires at least these columns:
+- `image_path`: relative path from `dataset/images` (preferred)
 - `label`: one of the 5 labels above
-- `captureSessionId`: group id used to avoid split leakage
+- `captureSessionId`: session/group id used to prevent leakage between train/val/test
 
-Example row:
+Example:
 
 ```csv
 image_path,label,captureSessionId
 nitrogen_deficiency/N_001.jpg,nitrogen_deficiency,nitrogen_s003
 ```
 
-## Build Dataset From Verified Production Scans
+## How Split Logic Works (Important)
+Configured in `ml/configs/v1.yaml`:
+- Split ratio: 70% train / 15% val / 15% test
+- Group column: `captureSessionId`
+- Strategy: grouped split (`per_label_grouped`)
 
-```bash
-node ml/export_verified_dataset.js \
-  --project <firebase-project-id> \
-  --bucket <storage-bucket> \
-  --output dataset \
-  --credentials /path/to/service-account.json
-```
+This means:
+- Images from the same `captureSessionId` stay in one split only.
+- This prevents leakage from near-duplicate photos.
 
-Optional schema migration for old docs:
+## If Your Raw Nutrient Dataset Is Mixed (N/P/K Prefix)
+If source folder has nutrient deficiency images with prefix conventions:
+- `N*` -> `nitrogen_deficiency`
+- `P*` -> `phosphorus_deficiency`
+- `K*` -> `potassium_deficiency`
 
-```bash
-node ml/migrate_ai_scans_schema.js \
-  --project <firebase-project-id> \
-  --credentials /path/to/service-account.json
-```
+Move/copy those files into the correct class folder before generating metadata rows.
 
-## Training Flow
-
-1. Quality audit (recommended every run):
+## Data Quality Pass (Run Before Training)
+Run audit to drop missing/corrupt/very low-quality/duplicate images:
 
 ```bash
 python ml/quality_audit.py \
@@ -90,13 +121,43 @@ python ml/quality_audit.py \
   --drop-exact-duplicates
 ```
 
-2. Train:
+Use `dataset/metadata.cleaned.csv` for training.
+
+## Training Configuration (Current Defaults)
+From `ml/configs/v1.yaml`:
+- Backbone: EfficientNetB0 transfer learning
+- Input size: 224
+- Batch size: 32
+- Stage A: 12 epochs (frozen backbone)
+- Stage B: 15 epochs (fine-tune top layers)
+- Unfreeze layers: 40
+- Dropout: 0.30
+- Label smoothing: 0.02
+- Oversampling: enabled (`p75`, max multiplier 3.0)
+- Normalization: `[0,255]`
+
+Augmentations include horizontal flip, mild rotation/zoom/brightness/contrast, and blur probability.
+
+## Train Manually (Step By Step)
 
 ```bash
 python ml/train.py --config ml/configs/v1.yaml
 ```
 
-3. Calibrate thresholds:
+After training, outputs are created in:
+- `ml/artifacts/<run_name>/`
+
+Key artifacts:
+- `model_final.keras`
+- `metrics.json`
+- `summary.json`
+- `history.json`
+- `train_split.csv`, `val_split.csv`, `test_split.csv`
+- `val_predictions.npz`, `test_predictions.npz`
+- `labels.txt`
+- `model_config.template.json`
+
+### Calibrate thresholds
 
 ```bash
 python ml/calibrate_thresholds.py \
@@ -105,7 +166,7 @@ python ml/calibrate_thresholds.py \
   --output ml/artifacts/<run>/model_config.calibrated.json
 ```
 
-4. Export TFLite:
+### Export TFLite
 
 ```bash
 python ml/export_tflite.py \
@@ -117,45 +178,88 @@ python ml/export_tflite.py \
   --ship-path assets/models/lettuce_model.tflite
 ```
 
-## One-Command Pipeline
+Variant selection logic:
+- Export both float16 and int8 (if representative dataset works)
+- Choose int8 only when:
+  - macro-F1 drop <= configured limit (`max-macro-f1-drop`, default 0.015)
+  - mean latency <= budget (`latency-budget-ms`, default 250)
+- Otherwise float16 is selected
+
+### Copy labels + calibrated model config to app assets
+
+```bash
+cp ml/artifacts/<run>/labels.txt assets/models/labels.txt
+cp ml/artifacts/<run>/model_config.calibrated.json assets/models/model_config.json
+```
+
+## One-Command Pipeline (Recommended)
+Runs everything and updates app assets automatically:
 
 ```bash
 python ml/run_pipeline.py --config ml/configs/v1.yaml --python python
 ```
 
-Pipeline steps:
-1. Train
-2. Threshold calibration
+Pipeline stages:
+1. train
+2. threshold calibration
 3. TFLite export + variant selection
-4. Asset update:
-   - `assets/models/lettuce_model.tflite`
-   - `assets/models/labels.txt`
-   - `assets/models/model_config.json`
+4. asset copy to `assets/models/`
 
-## Run Outputs
+## Retraining From Production Feedback (Verified Scans)
+Export verified scans from Firebase:
 
-Each run creates `ml/artifacts/<run_name>/` containing:
-- `model_final.keras`
-- `summary.json`
-- `metrics.json`
-- `history.json`
-- `train_split.csv`, `val_split.csv`, `test_split.csv`
-- `val_predictions.npz`, `test_predictions.npz`
-- `model_config.template.json`, `model_config.calibrated.json`
-- `tflite/` (export artifacts + `tflite_export_summary.json`)
+```bash
+node ml/export_verified_dataset.js \
+  --project <firebase-project-id> \
+  --bucket <storage-bucket> \
+  --output dataset \
+  --credentials /path/to/service-account.json
+```
 
-## Accuracy Notes
+If old `ai_scans` docs need migration:
 
-- The biggest practical gains usually come from better data, not larger model changes.
-- Keep class balance and session diversity high.
-- Avoid mixing near-duplicate images across train/val/test.
-- Keep label quality strict (2-pass review if possible).
+```bash
+node ml/migrate_ai_scans_schema.js \
+  --project <firebase-project-id> \
+  --credentials /path/to/service-account.json
+```
+
+## Accuracy And Data Guidelines
+- Target at least ~1000 images per class for stable performance.
+- Keep capture diversity high (device, lighting, background, growth stage).
+- Never split same capture session across train/val/test.
+- Use strict labeling review for uncertain samples.
+- Keep real field images in every training cycle.
+
+## App Integration Contract
+The app expects:
+- `assets/models/lettuce_model.tflite`
+- `assets/models/labels.txt`
+- `assets/models/model_config.json`
+
+`model_config.json` must include:
+- `modelVersion`
+- `inputSize`
+- `normalization`
+- `classThresholds`
+- `binaryMap`
 
 ## Troubleshooting
 
-- If training is very slow, confirm whether GPU is available.
-- If model collapses to one class, check:
-  - class distribution
-  - label correctness
-  - normalization consistency between training and inference
-- If int8 accuracy drops too much, ship float16.
+Training is slow
+- Confirm GPU is detected.
+- Reduce image size or batch size if needed.
+
+Model predicts mostly one class
+- Check class imbalance.
+- Check label noise.
+- Check normalization mismatch between training and app inference.
+
+int8 export fails
+- Run with float16 only (still valid for shipping).
+- Confirm representative CSV has readable files.
+
+App confidence behavior seems wrong
+- Re-check calibrated thresholds in `model_config.json`.
+- Ensure `labels.txt` order exactly matches model output order.
+
