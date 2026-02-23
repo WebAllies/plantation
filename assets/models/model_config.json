@@ -1,0 +1,21 @@
+{
+  "modelVersion": "lettuce_v2",
+  "inputSize": 224,
+  "normalization": "[-1,1]",
+  "classThresholds": {
+    "healthy": 0.62,
+    "tipburn": 0.58,
+    "nutrient_deficiency": 0.57,
+    "fungal_mildew": 0.61,
+    "pest_damage": 0.55,
+    "physical_damage": 0.56
+  },
+  "binaryMap": {
+    "healthy": "Healthy",
+    "tipburn": "Unhealthy",
+    "nutrient_deficiency": "Unhealthy",
+    "fungal_mildew": "Unhealthy",
+    "pest_damage": "Unhealthy",
+    "physical_damage": "Unhealthy"
+  }
+}

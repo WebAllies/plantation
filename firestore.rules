@@ -34,6 +34,15 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    function isAiScanVerificationPatch() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        "verificationStatus",
+        "verifiedLabel",
+        "verifiedBy",
+        "verifiedAt"
+      ]);
+    }
+
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdminOrSuperAdmin();
       allow create: if isOwner(uid) || isAdminOrSuperAdmin();
@@ -48,7 +57,8 @@ service cloud.firestore {
       allow read: if isSignedIn()
                   && (resource.data.userId == request.auth.uid
                       || isAdminOrSuperAdmin());
-      allow update, delete: if false;
+      allow update: if isAdminOrSuperAdmin() && isAiScanVerificationPatch();
+      allow delete: if false;
     }
 
     match /settings/{docId} {

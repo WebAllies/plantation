@@ -1,2 +1,6 @@
-Healthy
-Unhealthy
+healthy
+tipburn
+nutrient_deficiency
+fungal_mildew
+pest_damage
+physical_damage

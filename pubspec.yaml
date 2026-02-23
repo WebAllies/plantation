@@ -51,6 +51,7 @@ dependencies:
   image_picker: ^1.0.7
   csv: ^6.0.0
   cloud_functions: ^4.7.6
+  firebase_storage: ^11.6.9
   mqtt_client: ^10.11.1
   web_socket_channel: ^3.0.1
 
@@ -85,6 +86,7 @@ flutter:
 
     - assets/models/lettuce_model.tflite
     - assets/models/labels.txt
+    - assets/models/model_config.json
 
   #   - images/a_dot_ham.jpeg
 

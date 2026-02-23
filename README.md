@@ -340,3 +340,50 @@ Then compile/upload again.
 - Prefer separate credentials for app and devices.
 - Prefer strict ACLs per topic/device.
 - For production, replace `setInsecure()` in ESP with proper CA validation.
+
+## AI Model Pipeline (Lettuce v2)
+
+### App model assets
+
+- `assets/models/lettuce_model.tflite`
+- `assets/models/labels.txt` (6 classes)
+- `assets/models/model_config.json` (thresholds + binary map + version)
+
+### Firestore AI scan schema
+
+`ai_scans/{scanId}` now stores:
+
+- `predictedClass`
+- `predictedBinary`
+- `label` (legacy binary compatibility field)
+- `confidence`
+- `topK`
+- `modelVersion`
+- `imagePath`
+- `verificationStatus` (`pending|verified|rejected`)
+- `verifiedLabel`
+- `verifiedBy`
+- `verifiedAt`
+- `captureMetadata.farmId`
+- `captureMetadata.deviceId`
+- `captureMetadata.captureSessionId`
+- `captureMetadata.timeOfDay`
+- `createdAt`
+
+### Verification feedback loop
+
+- Super admins can verify/correct labels from `AI Scan Reports`.
+- Verified scans can be exported for retraining using:
+  - `node ml/export_verified_dataset.js ...`
+
+### Local training workspace
+
+Training scripts are in `ml/`:
+
+- `ml/train.py`
+- `ml/evaluate.py`
+- `ml/calibrate_thresholds.py`
+- `ml/export_tflite.py`
+- `ml/configs/v1.yaml`
+
+See `ml/README.md` for exact commands.

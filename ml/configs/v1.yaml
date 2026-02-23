@@ -1,0 +1,50 @@
+seed: 42
+
+data:
+  metadata_csv: dataset/metadata.csv
+  image_root: dataset/images
+  image_column: image_path
+  label_column: label
+  group_column: captureSessionId
+  allowed_labels:
+    - healthy
+    - tipburn
+    - nutrient_deficiency
+    - fungal_mildew
+    - pest_damage
+    - physical_damage
+  split:
+    train: 0.70
+    val: 0.15
+    test: 0.15
+
+training:
+  input_size: 224
+  batch_size: 32
+  stage_a_epochs: 15
+  stage_b_epochs: 20
+  stage_b_unfreeze_layers: 40
+  stage_a_lr: 0.001
+  stage_b_lr: 0.0001
+  dropout: 0.30
+  label_smoothing: 0.05
+  early_stopping_patience: 6
+  augmentation:
+    flip: true
+    rotation: 0.0556
+    zoom: 0.20
+    brightness: 0.15
+    contrast: 0.15
+    blur_probability: 0.10
+
+output:
+  root_dir: ml/artifacts
+  run_name_prefix: lettuce_v2
+
+binary_mapping:
+  healthy: Healthy
+  tipburn: Unhealthy
+  nutrient_deficiency: Unhealthy
+  fungal_mildew: Unhealthy
+  pest_damage: Unhealthy
+  physical_damage: Unhealthy
