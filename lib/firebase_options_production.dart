@@ -73,6 +73,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '810819815260',
     projectId: 'iotaquaapp',
     storageBucket: 'iotaquaapp.firebasestorage.app',
+    androidClientId: '810819815260-ertkpjev8g5clcn0papq4m0ic7tj9btn.apps.googleusercontent.com',
+    iosClientId: '810819815260-bj1b1lnjhgq180ai9ajfhf0p125bshtr.apps.googleusercontent.com',
     iosBundleId: 'com.example.iotAquaApp',
   );
 

@@ -1,26 +1,51 @@
 {
   "project_info": {
-    "project_number": "247703648498",
-    "project_id": "iotaquaapp-staging",
-    "storage_bucket": "iotaquaapp-staging.firebasestorage.app"
+    "project_number": "810819815260",
+    "project_id": "iotaquaapp",
+    "storage_bucket": "iotaquaapp.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:247703648498:android:9a457a08d6923e0007b86b",
+        "mobilesdk_app_id": "1:810819815260:android:10a3cf866a30ede16ea399",
         "android_client_info": {
           "package_name": "com.example.iot_aqua_app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "810819815260-ertkpjev8g5clcn0papq4m0ic7tj9btn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.iot_aqua_app",
+            "certificate_hash": "a98982159b87d2f13226d0a5adfcbd7e7526d676"
+          }
+        },
+        {
+          "client_id": "810819815260-cehhnktlq3oegftnor5am064ql09nm5o.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyD3HBEHparkzVJf7BSjgVGQsRZxcCA3ewY"
+          "current_key": "AIzaSyCKU-jSEXoftXGq9653hJql7YWXG7_Rtr8"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "810819815260-cehhnktlq3oegftnor5am064ql09nm5o.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "810819815260-bj1b1lnjhgq180ai9ajfhf0p125bshtr.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.iotAquaApp"
+              }
+            }
+          ]
         }
       }
     }

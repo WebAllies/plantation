@@ -17,18 +17,45 @@ final ThemeController themeController = ThemeController();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(options: FirebaseBootstrap.options);
+  Object? startupError;
+  StackTrace? startupStack;
+  try {
+    await Firebase.initializeApp(
+      options: FirebaseBootstrap.options,
+    ).timeout(const Duration(seconds: 20));
+    await themeController.load().timeout(const Duration(seconds: 10));
+  } catch (e, st) {
+    startupError = e;
+    startupStack = st;
+    debugPrint('Startup error: $e');
+    debugPrint('$st');
+  }
 
-  await themeController.load();
-
-  runApp(const MyApp());
+  runApp(MyApp(startupError: startupError, startupStack: startupStack));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final Object? startupError;
+  final StackTrace? startupStack;
+
+  const MyApp({
+    super.key,
+    this.startupError,
+    this.startupStack,
+  });
 
   @override
   Widget build(BuildContext context) {
+    if (startupError != null) {
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: _StartupErrorPage(
+          error: startupError!,
+          stack: startupStack,
+        ),
+      );
+    }
+
     return ChangeNotifierProvider(
       create: (_) => DeviceSelectionController(),
       child: AnimatedBuilder(
@@ -48,6 +75,37 @@ class MyApp extends StatelessWidget {
             home: const OnboardingPage(), // ✅ always show onboarding
           );
         },
+      ),
+    );
+  }
+}
+
+class _StartupErrorPage extends StatelessWidget {
+  final Object error;
+  final StackTrace? stack;
+
+  const _StartupErrorPage({
+    required this.error,
+    this.stack,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final env = FirebaseEnvironmentConfig.name;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Startup Error')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: SingleChildScrollView(
+          child: SelectableText(
+            'Environment: $env\n\n'
+            'App failed during startup.\n\n'
+            'Likely cause on Android: `google-services.json` project does not '
+            'match the selected FIREBASE_ENV options.\n\n'
+            'Error:\n$error\n\n'
+            'Stack:\n${stack ?? 'n/a'}',
+          ),
+        ),
       ),
     );
   }
