@@ -1,11 +1,21 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+// OPTIONAL (only if you want real profile photo upload):
+// Add to pubspec.yaml:
+//   image_picker: ^1.0.7
+//   firebase_storage: ^12.0.1
+//
+// import 'package:image_picker/image_picker.dart';
+// import 'package:firebase_storage/firebase_storage.dart';
+
 class ProfileTab extends StatefulWidget {
   final String name;
   final String email;
-  final String role;
+  final String role; // "Admin" | "Super Admin" | "Employee"
   final Future<void> Function() onLogout;
 
   const ProfileTab({
@@ -22,35 +32,101 @@ class ProfileTab extends StatefulWidget {
 
 class _ProfileTabState extends State<ProfileTab> {
   bool _busy = false;
-  final _nameCtrl = TextEditingController();
 
-  // simple personalization without storage
+  // Editable fields (industry-level profile)
+  final _nameCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+
+  // Read-only work fields (from Firestore)
+
+  String _assignedZone = "—"; // warehouse/zone/site
+  String _accessLevel = "—"; // e.g., Read / Write / Full
+
+  // Security / audit info (from Firestore)
+  DateTime? _lastLoginAt;
+  DateTime? _lastActivityAt;
+
+  // Analytics (from Firestore)
+  int _requestsCount = 0;
+  int _approvalsCount = 0;
+  int _aiUsageCount = 0;
+
+  // Personalization
   int _avatarColor = Colors.green.value;
+  String? _photoUrl; // if you later store profile photo URL
 
   @override
   void initState() {
     super.initState();
     _nameCtrl.text = widget.name;
-    _loadProfilePrefs();
+    _loadProfile(); // loads everything (prefs + work + security + stats)
+    _tryWriteLastLogin(); // updates last login timestamp (audit)
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _phoneCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _loadProfilePrefs() async {
+  /// Firestore user doc expected:
+  /// users/{uid} {
+  ///   name, phone, role,
+  ///   employeeId, department, assignedZone, accessLevel,
+  ///   avatarColor, photoUrl,
+  ///   lastLoginAt, lastActivityAt,
+  ///   stats: { requestsCount, approvalsCount, aiUsageCount }
+  /// }
+  Future<void> _loadProfile() async {
     final u = FirebaseAuth.instance.currentUser;
     if (u == null) return;
 
-    final doc = await FirebaseFirestore.instance.collection("users").doc(u.uid).get();
-    final data = doc.data() ?? {};
-    if (!mounted) return;
+    try {
+      final doc = await FirebaseFirestore.instance.collection("users").doc(u.uid).get();
+      final data = doc.data() ?? {};
+      if (!mounted) return;
 
-    setState(() {
-      _avatarColor = (data["avatarColor"] is int) ? data["avatarColor"] as int : Colors.green.value;
-    });
+      final stats = (data["stats"] is Map) ? (data["stats"] as Map) : const {};
+
+      setState(() {
+        _avatarColor = (data["avatarColor"] is int) ? data["avatarColor"] as int : Colors.green.value;
+        _photoUrl = (data["photoUrl"] is String) ? data["photoUrl"] as String : null;
+
+        _nameCtrl.text = (data["name"] is String && (data["name"] as String).trim().isNotEmpty)
+            ? (data["name"] as String)
+            : widget.name;
+
+        _phoneCtrl.text = (data["phone"] is String) ? (data["phone"] as String) : "";
+
+        _lastLoginAt = (data["lastLoginAt"] is Timestamp) ? (data["lastLoginAt"] as Timestamp).toDate() : null;
+        _lastActivityAt = (data["lastActivityAt"] is Timestamp) ? (data["lastActivityAt"] as Timestamp).toDate() : null;
+
+        _requestsCount = _asInt(stats["requestsCount"]);
+        _approvalsCount = _asInt(stats["approvalsCount"]);
+        _aiUsageCount = _asInt(stats["aiUsageCount"]);
+      });
+    } catch (_) {
+      // ignore UI crash; keep defaults
+    }
+  }
+
+  int _asInt(dynamic v) {
+    if (v is int) return v;
+    if (v is double) return v.toInt();
+    if (v is String) return int.tryParse(v) ?? 0;
+    return 0;
+  }
+
+  Future<void> _tryWriteLastLogin() async {
+    final u = FirebaseAuth.instance.currentUser;
+    if (u == null) return;
+
+    try {
+      await FirebaseFirestore.instance.collection("users").doc(u.uid).set({
+        "lastLoginAt": FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (_) {}
   }
 
   String _initials(String nameOrEmail) {
@@ -65,11 +141,17 @@ class _ProfileTabState extends State<ProfileTab> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  bool get _isSuperAdmin => widget.role.toLowerCase().contains("super");
+  bool get _isAdmin => widget.role.toLowerCase().contains("admin") || _isSuperAdmin;
+  bool get _isEmployee => widget.role.toLowerCase().contains("employee");
+
   Future<void> _saveProfile() async {
     final u = FirebaseAuth.instance.currentUser;
     if (u == null) return;
 
     final newName = _nameCtrl.text.trim();
+    final newPhone = _phoneCtrl.text.trim();
+
     if (newName.isEmpty) {
       _toast("Name cannot be empty.");
       return;
@@ -78,10 +160,15 @@ class _ProfileTabState extends State<ProfileTab> {
     try {
       setState(() => _busy = true);
 
-      await FirebaseFirestore.instance.collection("users").doc(u.uid).update({
+      await FirebaseFirestore.instance.collection("users").doc(u.uid).set({
         "name": newName,
+        "phone": newPhone,
         "avatarColor": _avatarColor,
-      });
+        // Keep role in Firestore too (read-only from UI)
+        "role": widget.role,
+        "updatedAt": FieldValue.serverTimestamp(),
+        "lastActivityAt": FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
       await u.updateDisplayName(newName);
 
@@ -152,6 +239,11 @@ class _ProfileTabState extends State<ProfileTab> {
                 await u.reauthenticateWithCredential(cred);
                 await u.updatePassword(newPass);
 
+                // audit
+                await FirebaseFirestore.instance.collection("users").doc(u.uid).set({
+                  "lastActivityAt": FieldValue.serverTimestamp(),
+                }, SetOptions(merge: true));
+
                 if (!mounted) return;
                 setState(() => _busy = false);
                 Navigator.pop(context);
@@ -174,7 +266,14 @@ class _ProfileTabState extends State<ProfileTab> {
 
   Future<void> _pickAvatarColor() async {
     final colors = <Color>[
-      Colors.green, Colors.blue, Colors.orange, Colors.purple, Colors.teal, Colors.red
+      Colors.green,
+      Colors.blue,
+      Colors.orange,
+      Colors.purple,
+      Colors.teal,
+      Colors.red,
+      Colors.brown,
+      Colors.indigo,
     ];
 
     await showModalBottomSheet(
@@ -200,14 +299,108 @@ class _ProfileTabState extends State<ProfileTab> {
     );
   }
 
+  // OPTIONAL (real profile photo upload). Uncomment imports + pubspec deps above to use.
+  /*
+  Future<void> _pickAndUploadPhoto() async {
+    final u = FirebaseAuth.instance.currentUser;
+    if (u == null) return;
+
+    try {
+      setState(() => _busy = true);
+
+      final picker = ImagePicker();
+      final x = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+      if (x == null) {
+        setState(() => _busy = false);
+        return;
+      }
+
+      final ref = FirebaseStorage.instance.ref("users/${u.uid}/profile.jpg");
+      await ref.putFile(File(x.path));
+      final url = await ref.getDownloadURL();
+
+      await FirebaseFirestore.instance.collection("users").doc(u.uid).set({
+        "photoUrl": url,
+        "lastActivityAt": FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (!mounted) return;
+      setState(() {
+        _photoUrl = url;
+        _busy = false;
+      });
+
+      _toast("Profile picture updated ✅");
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _toast("Failed: $e");
+    }
+  }
+  */
+
+  Future<void> _openActivityLog() async {
+    // Minimal, dissertation-ready: show last activity + basic info.
+    // If you already have /logs page, replace this with Navigator.push to it.
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("My Activity"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Last login: ${_fmt(_lastLoginAt)}"),
+            const SizedBox(height: 8),
+            Text("Last activity: ${_fmt(_lastActivityAt)}"),
+            const SizedBox(height: 12),
+        
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Close")),
+        ],
+      ),
+    );
+  }
+
+  String _fmt(DateTime? dt) {
+    if (dt == null) return "—";
+    final y = dt.year.toString().padLeft(4, "0");
+    final m = dt.month.toString().padLeft(2, "0");
+    final d = dt.day.toString().padLeft(2, "0");
+    final hh = dt.hour.toString().padLeft(2, "0");
+    final mm = dt.minute.toString().padLeft(2, "0");
+    return "$y-$m-$d  $hh:$mm";
+  }
+
+  Widget _kv(String k, String v, {IconData? icon}) {
+    return ListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      leading: icon == null ? null : Icon(icon, size: 20),
+      title: Text(k, style: const TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: Text(v),
+    );
+  }
+
+  Widget _statChip(String label, int value, IconData icon) {
+    return Chip(
+      avatar: Icon(icon, size: 16),
+      label: Text("$label: $value"),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final displayName = widget.name.trim().isEmpty ? (widget.email) : widget.name;
+    final displayName = _nameCtrl.text.trim().isEmpty ? (widget.email) : _nameCtrl.text.trim();
     final initials = _initials(displayName);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
+        // ===== Header =====
         Card(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           child: Padding(
@@ -219,8 +412,12 @@ class _ProfileTabState extends State<ProfileTab> {
                     CircleAvatar(
                       radius: 34,
                       backgroundColor: Color(_avatarColor),
-                      child: Text(initials,
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white)),
+                      // If you enable photoUrl, you can replace with NetworkImage
+                      // backgroundImage: (_photoUrl != null) ? NetworkImage(_photoUrl!) : null,
+                      child: Text(
+                        initials,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white),
+                      ),
                     ),
                     Positioned(
                       bottom: 0,
@@ -237,6 +434,24 @@ class _ProfileTabState extends State<ProfileTab> {
                         ),
                       ),
                     ),
+                    // OPTIONAL: photo upload button (uncomment if you enable upload)
+                    /*
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: InkWell(
+                        onTap: _busy ? null : _pickAndUploadPhoto,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Theme.of(context).colorScheme.secondary,
+                          ),
+                          child: const Icon(Icons.camera_alt, size: 16, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                    */
                   ],
                 ),
                 const SizedBox(width: 14),
@@ -248,7 +463,21 @@ class _ProfileTabState extends State<ProfileTab> {
                       const SizedBox(height: 4),
                       Text(widget.email, style: const TextStyle(color: Colors.black54)),
                       const SizedBox(height: 8),
-                      Chip(label: Text(widget.role), visualDensity: VisualDensity.compact),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          Chip(
+                            label: Text(widget.role),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          if (_isSuperAdmin)
+                            const Chip(
+                              label: Text("Highest Privilege"),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -259,6 +488,11 @@ class _ProfileTabState extends State<ProfileTab> {
 
         const SizedBox(height: 12),
 
+       
+
+        
+
+        // ===== Account (editable) =====
         Card(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           child: Padding(
@@ -268,7 +502,6 @@ class _ProfileTabState extends State<ProfileTab> {
               children: [
                 const Text("Account", style: TextStyle(fontWeight: FontWeight.w800)),
                 const SizedBox(height: 12),
-
                 TextField(
                   controller: _nameCtrl,
                   decoration: const InputDecoration(
@@ -277,7 +510,15 @@ class _ProfileTabState extends State<ProfileTab> {
                   ),
                 ),
                 const SizedBox(height: 12),
-
+                TextField(
+                  controller: _phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: "Phone number",
+                    prefixIcon: Icon(Icons.phone),
+                  ),
+                ),
+                const SizedBox(height: 14),
                 Row(
                   children: [
                     Expanded(
@@ -299,18 +540,52 @@ class _ProfileTabState extends State<ProfileTab> {
                     ),
                   ],
                 ),
+              ],
+            ),
+          ),
+        ),
 
+        const SizedBox(height: 12),
+
+
+        // ===== Security & Logs =====
+        Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("Security & Activity", style: TextStyle(fontWeight: FontWeight.w800)),
                 const SizedBox(height: 10),
-
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                  onPressed: _busy ? null : widget.onLogout,
-                  icon: const Icon(Icons.logout),
-                  label: const Text("Logout"),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.history),
+                  title: const Text("View my activity"),
+                  subtitle: const Text("Last login, last activity, and audit-ready info"),
+                  onTap: _busy ? null : _openActivityLog,
+                ),
+                const Divider(),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.privacy_tip_outlined),
+                  title: const Text("Privacy"),
+                  subtitle: const Text("Your data is stored securely in Firebase (Firestore)."),
+                  onTap: () => _toast("Add a Privacy page if your dissertation requires it."),
                 ),
               ],
             ),
           ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // ===== Logout =====
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+          onPressed: _busy ? null : widget.onLogout,
+          icon: const Icon(Icons.logout),
+          label: const Text("Logout"),
         ),
       ],
     );
