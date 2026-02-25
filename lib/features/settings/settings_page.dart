@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:iot_aqua_app/ai/superadmin_ai_reports_page.dart';
 import 'package:iot_aqua_app/core/device/device_selector_header.dart';
+import 'package:iot_aqua_app/core/services/auth_service.dart';
 
 import '../auth/login_page.dart';
 import '../sensors/sensor_settings_page.dart';
@@ -19,6 +20,8 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+  final AuthService _authService = AuthService();
+
   bool _loading = true;
   String _role = "employee";
   String _name = "";
@@ -73,7 +76,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _logout() async {
-    await FirebaseAuth.instance.signOut();
+    await _authService.signOut();
     if (!mounted) return;
 
     Navigator.pushAndRemoveUntil(

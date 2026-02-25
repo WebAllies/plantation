@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 class DeviceSummary {
@@ -19,7 +20,11 @@ class DeviceSummary {
 
 class DeviceSelectionController extends ChangeNotifier {
   final FirebaseFirestore? _db;
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sub;
+  final FirebaseAuth? _auth;
+  StreamSubscription<User?>? _authSub;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _deviceSub;
+  int _streamGeneration = 0;
+  bool _isSignedIn = false;
 
   List<DeviceSummary> _devices = const [];
   String? _selectedDeviceId;
@@ -28,15 +33,17 @@ class DeviceSelectionController extends ChangeNotifier {
 
   DeviceSelectionController({
     FirebaseFirestore? firestore,
+    FirebaseAuth? auth,
     bool autoListen = true,
-  }) : _db = autoListen ? (firestore ?? FirebaseFirestore.instance) : null {
-    if (autoListen) {
-      _sub = _db!
-          .collection('devices')
-          .orderBy('lastSeen', descending: true)
-          .snapshots()
-          .listen(_onSnapshot, onError: _onError);
-    }
+  }) : _db = autoListen ? (firestore ?? FirebaseFirestore.instance) : firestore,
+       _auth = autoListen ? (auth ?? FirebaseAuth.instance) : auth {
+    if (!autoListen) return;
+
+    final authClient = _auth;
+    if (authClient == null) return;
+
+    _authSub = authClient.authStateChanges().listen(_handleAuthChanged);
+    _handleSignedInChange(authClient.currentUser != null);
   }
 
   List<DeviceSummary> get devices => _devices;
@@ -48,6 +55,56 @@ class DeviceSelectionController extends ChangeNotifier {
     if (_selectedDeviceId == id) return;
     _selectedDeviceId = id;
     notifyListeners();
+  }
+
+  void _handleAuthChanged(User? user) {
+    _handleSignedInChange(user != null);
+  }
+
+  void _handleSignedInChange(bool signedIn) {
+    final generation = ++_streamGeneration;
+    _isSignedIn = signedIn;
+    _stopDeviceStream();
+
+    if (!signedIn) {
+      _devices = const [];
+      _selectedDeviceId = null;
+      _loading = false;
+      _error = null;
+      notifyListeners();
+      return;
+    }
+
+    _loading = true;
+    _error = null;
+    notifyListeners();
+
+    _startDeviceStream(generation);
+  }
+
+  void _startDeviceStream(int generation) {
+    final db = _db;
+    if (db == null) return;
+
+    _deviceSub = db
+        .collection('devices')
+        .orderBy('lastSeen', descending: true)
+        .snapshots()
+        .listen(
+          (snapshot) {
+            if (generation != _streamGeneration) return;
+            _onSnapshot(snapshot);
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            if (generation != _streamGeneration) return;
+            _onError(error, stackTrace);
+          },
+        );
+  }
+
+  void _stopDeviceStream() {
+    _deviceSub?.cancel();
+    _deviceSub = null;
   }
 
   void _onSnapshot(QuerySnapshot<Map<String, dynamic>> snapshot) {
@@ -65,6 +122,10 @@ class DeviceSelectionController extends ChangeNotifier {
       );
     }).toList();
 
+    _applyDevices(parsed);
+  }
+
+  void _applyDevices(List<DeviceSummary> parsed) {
     final onlineFirst = <DeviceSummary>[];
     final offline = <DeviceSummary>[];
     for (final d in parsed) {
@@ -91,6 +152,15 @@ class DeviceSelectionController extends ChangeNotifier {
   }
 
   void _onError(Object error, StackTrace _) {
+    if (!_isSignedIn) {
+      if (_error != null || _loading) {
+        _loading = false;
+        _error = null;
+        notifyListeners();
+      }
+      return;
+    }
+
     _loading = false;
     _error = error.toString();
     notifyListeners();
@@ -110,9 +180,36 @@ class DeviceSelectionController extends ChangeNotifier {
     notifyListeners();
   }
 
+  @visibleForTesting
+  void debugHandleAuthChange({required bool signedIn}) {
+    _handleSignedInChange(signedIn);
+  }
+
+  @visibleForTesting
+  int get debugStreamGeneration => _streamGeneration;
+
+  @visibleForTesting
+  void debugApplySnapshotForGeneration({
+    required int generation,
+    required List<DeviceSummary> devices,
+  }) {
+    if (generation != _streamGeneration) return;
+    _applyDevices(devices);
+  }
+
+  @visibleForTesting
+  void debugApplyErrorForGeneration({
+    required int generation,
+    required Object error,
+  }) {
+    if (generation != _streamGeneration) return;
+    _onError(error, StackTrace.empty);
+  }
+
   @override
   void dispose() {
-    _sub?.cancel();
+    _stopDeviceStream();
+    _authSub?.cancel();
     super.dispose();
   }
 }
