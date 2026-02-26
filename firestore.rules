@@ -44,6 +44,9 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
+      // App lock metadata lives in users/{uid}.security.appLock.
+      // Admin/Super Admin updates are allowed so they can trigger PIN reset flows:
+      // security.appLock.pinVersion / resetAt / resetByUid / resetByRole.
       allow read: if isOwner(uid) || isAdminOrSuperAdmin();
       allow create: if isOwner(uid) || isAdminOrSuperAdmin();
       allow update: if isAdminOrSuperAdmin()
@@ -64,6 +67,19 @@ service cloud.firestore {
     match /settings/{docId} {
       allow read: if isSignedIn();
       allow create, update, delete: if isAdminOrSuperAdmin();
+    }
+
+    // System config/status docs used by System tab:
+    // system/settings, system/status, system/ai, etc.
+    match /system/{docId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdminOrSuperAdmin();
+
+      // Future-proof any nested docs under system/{docId}/...
+      match /{subPath=**} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isAdminOrSuperAdmin();
+      }
     }
 
     match /devices/{deviceId} {

@@ -10,7 +10,7 @@ import 'firebase_environment.dart';
 import 'core/theme/theme_controller.dart';
 
 // Start page
-import 'features/onboarding/onboarding_page.dart';
+import 'features/auth/app_auth_root.dart';
 
 final ThemeController themeController = ThemeController();
 
@@ -38,21 +38,14 @@ class MyApp extends StatelessWidget {
   final Object? startupError;
   final StackTrace? startupStack;
 
-  const MyApp({
-    super.key,
-    this.startupError,
-    this.startupStack,
-  });
+  const MyApp({super.key, this.startupError, this.startupStack});
 
   @override
   Widget build(BuildContext context) {
     if (startupError != null) {
       return MaterialApp(
         debugShowCheckedModeBanner: false,
-        home: _StartupErrorPage(
-          error: startupError!,
-          stack: startupStack,
-        ),
+        home: _StartupErrorPage(error: startupError!, stack: startupStack),
       );
     }
 
@@ -72,7 +65,7 @@ class MyApp extends StatelessWidget {
               useMaterial3: true,
               brightness: Brightness.dark,
             ),
-            home: const OnboardingPage(), // ✅ always show onboarding
+            home: const AppAuthRoot(),
           );
         },
       ),
@@ -84,10 +77,7 @@ class _StartupErrorPage extends StatelessWidget {
   final Object error;
   final StackTrace? stack;
 
-  const _StartupErrorPage({
-    required this.error,
-    this.stack,
-  });
+  const _StartupErrorPage({required this.error, this.stack});
 
   @override
   Widget build(BuildContext context) {

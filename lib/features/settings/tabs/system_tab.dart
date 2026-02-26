@@ -3,17 +3,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:iot_aqua_app/main.dart'; // for themeController
+import 'package:iot_aqua_app/pages/manage_roles_page.dart';
 import 'package:iot_aqua_app/pages/super_admin_dashboard.dart';
 
 class SystemTab extends StatefulWidget {
   final String role; // "Super Admin" | "Admin" | "Employee"
   final bool isSuperAdmin;
 
-  const SystemTab({
-    super.key,
-    required this.role,
-    required this.isSuperAdmin,
-  });
+  const SystemTab({super.key, required this.role, required this.isSuperAdmin});
 
   @override
   State<SystemTab> createState() => _SystemTabState();
@@ -38,7 +35,8 @@ class _SystemTabState extends State<SystemTab> {
 
   // ---------- Helpers ----------
   bool get _isSuperAdmin => widget.role.toLowerCase().contains("super");
-  bool get _isAdmin => widget.role.toLowerCase().contains("admin") || _isSuperAdmin;
+  bool get _isAdmin =>
+      widget.role.toLowerCase().contains("admin") || _isSuperAdmin;
 
   void _toast(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
@@ -64,14 +62,23 @@ class _SystemTabState extends State<SystemTab> {
   // ---------- Firestore: system settings ----------
   Future<void> _loadSystemSettings() async {
     try {
-      final doc = await FirebaseFirestore.instance.collection("system").doc("settings").get();
+      final doc = await FirebaseFirestore.instance
+          .collection("system")
+          .doc("settings")
+          .get();
       final data = doc.data() ?? {};
       if (!mounted) return;
 
       setState(() {
-        _enableNotifications = (data["enableNotifications"] is bool) ? data["enableNotifications"] as bool : true;
-        _autoMode = (data["autoMode"] is bool) ? data["autoMode"] as bool : true;
-        _maintenanceMode = (data["maintenanceMode"] is bool) ? data["maintenanceMode"] as bool : false;
+        _enableNotifications = (data["enableNotifications"] is bool)
+            ? data["enableNotifications"] as bool
+            : true;
+        _autoMode = (data["autoMode"] is bool)
+            ? data["autoMode"] as bool
+            : true;
+        _maintenanceMode = (data["maintenanceMode"] is bool)
+            ? data["maintenanceMode"] as bool
+            : false;
       });
     } catch (_) {
       // keep defaults
@@ -85,13 +92,17 @@ class _SystemTabState extends State<SystemTab> {
   }) async {
     try {
       setState(() => _busy = true);
-      await FirebaseFirestore.instance.collection("system").doc("settings").set({
-        if (enableNotifications != null) "enableNotifications": enableNotifications,
-        if (autoMode != null) "autoMode": autoMode,
-        if (maintenanceMode != null) "maintenanceMode": maintenanceMode,
-        "updatedAt": FieldValue.serverTimestamp(),
-        "updatedBy": FirebaseAuth.instance.currentUser?.uid ?? "unknown",
-      }, SetOptions(merge: true));
+      await FirebaseFirestore.instance
+          .collection("system")
+          .doc("settings")
+          .set({
+            if (enableNotifications != null)
+              "enableNotifications": enableNotifications,
+            if (autoMode != null) "autoMode": autoMode,
+            if (maintenanceMode != null) "maintenanceMode": maintenanceMode,
+            "updatedAt": FieldValue.serverTimestamp(),
+            "updatedBy": FirebaseAuth.instance.currentUser?.uid ?? "unknown",
+          }, SetOptions(merge: true));
 
       if (!mounted) return;
       setState(() => _busy = false);
@@ -123,13 +134,13 @@ class _SystemTabState extends State<SystemTab> {
           .doc(_defaultDeviceId)
           .collection("commands")
           .add({
-        "type": type,
-        "targetState": targetState,
-        "status": "pending",
-        "requestedBy": uid,
-        "requestedByEmail": email,
-        "requestedAt": FieldValue.serverTimestamp(),
-      });
+            "type": type,
+            "targetState": targetState,
+            "status": "pending",
+            "requestedBy": uid,
+            "requestedByEmail": email,
+            "requestedAt": FieldValue.serverTimestamp(),
+          });
 
       if (!mounted) return;
       setState(() => _busy = false);
@@ -143,14 +154,14 @@ class _SystemTabState extends State<SystemTab> {
 
   // ---------- UI blocks ----------
   Widget _sectionTitle(String t) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Text(t, style: const TextStyle(fontWeight: FontWeight.w900)),
-      );
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Text(t, style: const TextStyle(fontWeight: FontWeight.w900)),
+  );
 
   Widget _miniCard({required Widget child}) => Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        child: Padding(padding: const EdgeInsets.all(14), child: child),
-      );
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+    child: Padding(padding: const EdgeInsets.all(14), child: child),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -167,7 +178,10 @@ class _SystemTabState extends State<SystemTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("System Role", style: TextStyle(fontWeight: FontWeight.w800)),
+                    const Text(
+                      "System Role",
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
                     const SizedBox(height: 4),
                     Text(widget.role),
                   ],
@@ -185,12 +199,21 @@ class _SystemTabState extends State<SystemTab> {
         // ===================== SYSTEM STATUS =====================
         _sectionTitle("System Status"),
         StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance.collection("system").doc("status").snapshots(),
+          stream: FirebaseFirestore.instance
+              .collection("system")
+              .doc("status")
+              .snapshots(),
           builder: (context, snap) {
             final data = snap.data?.data() ?? {};
-            final online = (data["cloudOnline"] is bool) ? data["cloudOnline"] as bool : true;
-            final lastSync = (data["lastSyncAt"] is Timestamp) ? (data["lastSyncAt"] as Timestamp).toDate() : null;
-            final env = (data["environment"] is String) ? data["environment"] as String : "prod";
+            final online = (data["cloudOnline"] is bool)
+                ? data["cloudOnline"] as bool
+                : true;
+            final lastSync = (data["lastSyncAt"] is Timestamp)
+                ? (data["lastSyncAt"] as Timestamp).toDate()
+                : null;
+            final env = (data["environment"] is String)
+                ? data["environment"] as String
+                : "prod";
 
             return _miniCard(
               child: Column(
@@ -230,13 +253,21 @@ class _SystemTabState extends State<SystemTab> {
         // ===================== DEVICES =====================
         _sectionTitle("Devices (IoT Monitoring)"),
         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance.collection("devices").orderBy("deviceId").limit(10).snapshots(),
+          stream: FirebaseFirestore.instance
+              .collection("devices")
+              .orderBy("deviceId")
+              .limit(10)
+              .snapshots(),
           builder: (context, snap) {
             if (!snap.hasData) {
               return _miniCard(
                 child: Row(
                   children: const [
-                    SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                    SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
                     SizedBox(width: 10),
                     Text("Loading devices..."),
                   ],
@@ -247,7 +278,9 @@ class _SystemTabState extends State<SystemTab> {
             final docs = snap.data!.docs;
             if (docs.isEmpty) {
               return _miniCard(
-                child: const Text("No devices found. Add documents in devices/{deviceId}."),
+                child: const Text(
+                  "No devices found. Add documents in devices/{deviceId}.",
+                ),
               );
             }
 
@@ -256,11 +289,7 @@ class _SystemTabState extends State<SystemTab> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   for (final d in docs) ...[
-                    _DeviceTile(
-                      deviceId: d.id,
-                      data: d.data(),
-                      fmt: _fmt,
-                    ),
+                    _DeviceTile(deviceId: d.id, data: d.data(), fmt: _fmt),
                     const Divider(),
                   ],
                   const SizedBox(height: 6),
@@ -286,7 +315,9 @@ class _SystemTabState extends State<SystemTab> {
                 contentPadding: EdgeInsets.zero,
                 secondary: const Icon(Icons.autorenew),
                 title: const Text("Auto Mode"),
-                subtitle: const Text("Automatic valve/pump actions using schedules"),
+                subtitle: const Text(
+                  "Automatic valve/pump actions using schedules",
+                ),
                 value: _autoMode,
                 onChanged: (_isAdmin && !_busy)
                     ? (v) async {
@@ -300,9 +331,13 @@ class _SystemTabState extends State<SystemTab> {
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.schedule),
                 title: const Text("Schedules"),
-                subtitle: const Text("Next run time + recent executions (connect to your schedule collection)"),
+                subtitle: const Text(
+                  "Next run time + recent executions (connect to your schedule collection)",
+                ),
                 onTap: () {
-                  _toast("If you share your schedule Firestore structure, I'll connect this fully.");
+                  _toast(
+                    "If you share your schedule Firestore structure, I'll connect this fully.",
+                  );
                 },
               ),
             ],
@@ -318,13 +353,20 @@ class _SystemTabState extends State<SystemTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("Send a manual command to device (writes to Firestore commands)."),
+                const Text(
+                  "Send a manual command to device (writes to Firestore commands).",
+                ),
                 const SizedBox(height: 10),
                 Row(
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: _busy ? null : () => _sendDeviceCommand(type: "pump", targetState: true),
+                        onPressed: _busy
+                            ? null
+                            : () => _sendDeviceCommand(
+                                type: "pump",
+                                targetState: true,
+                              ),
                         icon: const Icon(Icons.water),
                         label: const Text("Pump ON"),
                       ),
@@ -332,7 +374,12 @@ class _SystemTabState extends State<SystemTab> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: _busy ? null : () => _sendDeviceCommand(type: "pump", targetState: false),
+                        onPressed: _busy
+                            ? null
+                            : () => _sendDeviceCommand(
+                                type: "pump",
+                                targetState: false,
+                              ),
                         icon: const Icon(Icons.water_drop_outlined),
                         label: const Text("Pump OFF"),
                       ),
@@ -344,7 +391,12 @@ class _SystemTabState extends State<SystemTab> {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: _busy ? null : () => _sendDeviceCommand(type: "valve", targetState: true),
+                        onPressed: _busy
+                            ? null
+                            : () => _sendDeviceCommand(
+                                type: "valve",
+                                targetState: true,
+                              ),
                         icon: const Icon(Icons.tune),
                         label: const Text("Valve OPEN"),
                       ),
@@ -352,7 +404,12 @@ class _SystemTabState extends State<SystemTab> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: _busy ? null : () => _sendDeviceCommand(type: "valve", targetState: false),
+                        onPressed: _busy
+                            ? null
+                            : () => _sendDeviceCommand(
+                                type: "valve",
+                                targetState: false,
+                              ),
                         icon: const Icon(Icons.close),
                         label: const Text("Valve CLOSE"),
                       ),
@@ -385,7 +442,11 @@ class _SystemTabState extends State<SystemTab> {
               return _miniCard(
                 child: Row(
                   children: const [
-                    SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                    SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
                     SizedBox(width: 10),
                     Text("Loading logs..."),
                   ],
@@ -396,7 +457,9 @@ class _SystemTabState extends State<SystemTab> {
             final docs = snap.data!.docs;
             if (docs.isEmpty) {
               return _miniCard(
-                child: const Text("No logs yet. ESP32 should write to devices/{deviceId}/logs."),
+                child: const Text(
+                  "No logs yet. ESP32 should write to devices/{deviceId}/logs.",
+                ),
               );
             }
 
@@ -416,7 +479,11 @@ class _SystemTabState extends State<SystemTab> {
                   const SizedBox(height: 6),
                   if (_isAdmin)
                     OutlinedButton.icon(
-                      onPressed: _busy ? null : () => _toast("Next: export logs CSV/PDF (I can add this)."),
+                      onPressed: _busy
+                          ? null
+                          : () => _toast(
+                              "Next: export logs CSV/PDF (I can add this).",
+                            ),
                       icon: const Icon(Icons.download),
                       label: const Text("Export Logs"),
                     ),
@@ -431,13 +498,22 @@ class _SystemTabState extends State<SystemTab> {
         // ===================== AI MODULE =====================
         _sectionTitle("AI Module"),
         StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance.collection("system").doc("ai").snapshots(),
+          stream: FirebaseFirestore.instance
+              .collection("system")
+              .doc("ai")
+              .snapshots(),
           builder: (context, snap) {
             final data = snap.data?.data() ?? {};
-            final model = (data["modelName"] is String) ? data["modelName"] as String : "Leaf Health Classifier";
-            final version = (data["modelVersion"] is String) ? data["modelVersion"] as String : "v1.0";
+            final model = (data["modelName"] is String)
+                ? data["modelName"] as String
+                : "Leaf Health Classifier";
+            final version = (data["modelVersion"] is String)
+                ? data["modelVersion"] as String
+                : "v1.0";
             final f1 = data["f1Score"];
-            final lastUsed = (data["lastInferenceAt"] is Timestamp) ? (data["lastInferenceAt"] as Timestamp).toDate() : null;
+            final lastUsed = (data["lastInferenceAt"] is Timestamp)
+                ? (data["lastInferenceAt"] as Timestamp).toDate()
+                : null;
 
             return _miniCard(
               child: Column(
@@ -456,7 +532,9 @@ class _SystemTabState extends State<SystemTab> {
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.analytics),
                     title: const Text("Quality Metrics"),
-                    subtitle: Text("F1-score: ${f1 == null ? "—" : f1.toString()}"),
+                    subtitle: Text(
+                      "F1-score: ${f1 == null ? "—" : f1.toString()}",
+                    ),
                   ),
                   const Divider(),
                   ListTile(
@@ -489,7 +567,27 @@ class _SystemTabState extends State<SystemTab> {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const SuperAdminSettingsPage()),
+                      MaterialPageRoute(
+                        builder: (_) => const SuperAdminSettingsPage(),
+                      ),
+                    );
+                  },
+                ),
+                const Divider(),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.groups_2_outlined),
+                  title: const Text("Roles & App PIN Reset"),
+                  subtitle: const Text(
+                    "Manage roles and force PIN reset for users",
+                  ),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ManageRolesPage(),
+                      ),
                     );
                   },
                 ),
@@ -498,7 +596,9 @@ class _SystemTabState extends State<SystemTab> {
                   contentPadding: EdgeInsets.zero,
                   secondary: const Icon(Icons.build_circle),
                   title: const Text("Maintenance Mode"),
-                  subtitle: const Text("Disable critical actions for all users (demo-worthy)"),
+                  subtitle: const Text(
+                    "Disable critical actions for all users (demo-worthy)",
+                  ),
                   value: _maintenanceMode,
                   onChanged: _busy
                       ? null
@@ -513,6 +613,26 @@ class _SystemTabState extends State<SystemTab> {
           const SizedBox(height: 12),
         ],
 
+        if (_isAdmin && !_isSuperAdmin) ...[
+          _sectionTitle("Admin Tools"),
+          _miniCard(
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.groups_2_outlined),
+              title: const Text("App PIN Reset"),
+              subtitle: const Text("Reset user app PIN and security lock"),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ManageRolesPage()),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+
         // ===================== APP SETTINGS =====================
         _sectionTitle("App Preferences"),
         _miniCard(
@@ -522,7 +642,9 @@ class _SystemTabState extends State<SystemTab> {
                 contentPadding: EdgeInsets.zero,
                 secondary: const Icon(Icons.notifications_active),
                 title: const Text("Enable Notifications"),
-                subtitle: const Text("Alerts for pH, temperature, water level, etc."),
+                subtitle: const Text(
+                  "Alerts for pH, temperature, water level, etc.",
+                ),
                 value: _enableNotifications,
                 onChanged: _busy
                     ? null
@@ -558,7 +680,9 @@ class _SystemTabState extends State<SystemTab> {
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(Icons.info_outline),
                 title: Text("IoT Aqua App"),
-                subtitle: Text("Smart Aquaponics System • ATOL Case Study • Firebase + ESP32 + AI"),
+                subtitle: Text(
+                  "Smart Aquaponics System • ATOL Case Study • Firebase + ESP32 + AI",
+                ),
               ),
               Divider(),
               ListTile(
@@ -589,8 +713,12 @@ class _DeviceTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final online = (data["online"] is bool) ? data["online"] as bool : false;
-    final lastSeen = (data["lastSeenAt"] is Timestamp) ? (data["lastSeenAt"] as Timestamp).toDate() : null;
-    final firmware = (data["firmware"] is String) ? data["firmware"] as String : "—";
+    final lastSeen = (data["lastSeenAt"] is Timestamp)
+        ? (data["lastSeenAt"] as Timestamp).toDate()
+        : null;
+    final firmware = (data["firmware"] is String)
+        ? data["firmware"] as String
+        : "—";
     final ip = (data["ip"] is String) ? data["ip"] as String : "—";
     final rssi = data["wifiRssi"];
 
@@ -616,7 +744,9 @@ class _LogTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ts = (data["ts"] is Timestamp) ? (data["ts"] as Timestamp).toDate() : null;
+    final ts = (data["ts"] is Timestamp)
+        ? (data["ts"] as Timestamp).toDate()
+        : null;
     final level = (data["level"] is String) ? data["level"] as String : "info";
     final event = (data["event"] is String) ? data["event"] as String : "event";
     final detail = (data["detail"] is String) ? data["detail"] as String : "";

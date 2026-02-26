@@ -1,8 +1,9 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:iot_aqua_app/core/security/app_lock_models.dart';
+import 'package:iot_aqua_app/core/security/app_lock_service.dart';
+import 'package:iot_aqua_app/features/auth/app_auth_root.dart';
 
 // OPTIONAL (only if you want real profile photo upload):
 // Add to pubspec.yaml:
@@ -32,6 +33,10 @@ class ProfileTab extends StatefulWidget {
 
 class _ProfileTabState extends State<ProfileTab> {
   bool _busy = false;
+  final AppLockService _appLockService = AppLockService();
+  bool _lockBusy = false;
+  bool _pinConfigured = false;
+  bool _biometricEnabled = false;
 
   // Editable fields (industry-level profile)
   final _nameCtrl = TextEditingController();
@@ -61,6 +66,7 @@ class _ProfileTabState extends State<ProfileTab> {
     _nameCtrl.text = widget.name;
     _loadProfile(); // loads everything (prefs + work + security + stats)
     _tryWriteLastLogin(); // updates last login timestamp (audit)
+    _loadLockStatus();
   }
 
   @override
@@ -83,24 +89,39 @@ class _ProfileTabState extends State<ProfileTab> {
     if (u == null) return;
 
     try {
-      final doc = await FirebaseFirestore.instance.collection("users").doc(u.uid).get();
+      final doc = await FirebaseFirestore.instance
+          .collection("users")
+          .doc(u.uid)
+          .get();
       final data = doc.data() ?? {};
       if (!mounted) return;
 
       final stats = (data["stats"] is Map) ? (data["stats"] as Map) : const {};
 
       setState(() {
-        _avatarColor = (data["avatarColor"] is int) ? data["avatarColor"] as int : Colors.green.value;
-        _photoUrl = (data["photoUrl"] is String) ? data["photoUrl"] as String : null;
+        _avatarColor = (data["avatarColor"] is int)
+            ? data["avatarColor"] as int
+            : Colors.green.value;
+        _photoUrl = (data["photoUrl"] is String)
+            ? data["photoUrl"] as String
+            : null;
 
-        _nameCtrl.text = (data["name"] is String && (data["name"] as String).trim().isNotEmpty)
+        _nameCtrl.text =
+            (data["name"] is String &&
+                (data["name"] as String).trim().isNotEmpty)
             ? (data["name"] as String)
             : widget.name;
 
-        _phoneCtrl.text = (data["phone"] is String) ? (data["phone"] as String) : "";
+        _phoneCtrl.text = (data["phone"] is String)
+            ? (data["phone"] as String)
+            : "";
 
-        _lastLoginAt = (data["lastLoginAt"] is Timestamp) ? (data["lastLoginAt"] as Timestamp).toDate() : null;
-        _lastActivityAt = (data["lastActivityAt"] is Timestamp) ? (data["lastActivityAt"] as Timestamp).toDate() : null;
+        _lastLoginAt = (data["lastLoginAt"] is Timestamp)
+            ? (data["lastLoginAt"] as Timestamp).toDate()
+            : null;
+        _lastActivityAt = (data["lastActivityAt"] is Timestamp)
+            ? (data["lastActivityAt"] as Timestamp).toDate()
+            : null;
 
         _requestsCount = _asInt(stats["requestsCount"]);
         _approvalsCount = _asInt(stats["approvalsCount"]);
@@ -129,12 +150,188 @@ class _ProfileTabState extends State<ProfileTab> {
     } catch (_) {}
   }
 
+  Future<void> _loadLockStatus() async {
+    final u = FirebaseAuth.instance.currentUser;
+    if (u == null) return;
+
+    try {
+      final state = await _appLockService.getLockState(u.uid);
+      if (!mounted) return;
+      setState(() {
+        _pinConfigured = !state.needsSetup;
+        _biometricEnabled = state.biometricEnabled;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _changePinDialog() async {
+    final u = FirebaseAuth.instance.currentUser;
+    if (u == null) return;
+
+    final currentCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Change App PIN"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: currentCtrl,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              decoration: const InputDecoration(
+                labelText: "Current PIN",
+                counterText: '',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: newCtrl,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              decoration: const InputDecoration(
+                labelText: "New PIN (6 digits)",
+                counterText: '',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: confirmCtrl,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              decoration: const InputDecoration(
+                labelText: "Confirm new PIN",
+                counterText: '',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final currentPin = currentCtrl.text.trim();
+              final newPin = newCtrl.text.trim();
+              final confirmPin = confirmCtrl.text.trim();
+
+              if (!AppLockService.isValidPin(newPin)) {
+                _toast("New PIN must be exactly 6 digits.");
+                return;
+              }
+              if (newPin != confirmPin) {
+                _toast("PIN confirmation does not match.");
+                return;
+              }
+
+              setState(() => _lockBusy = true);
+              final verify = await _appLockService.verifyPin(
+                uid: u.uid,
+                pin: currentPin,
+              );
+              if (verify.status != AppLockVerifyStatus.success) {
+                setState(() => _lockBusy = false);
+                _toast("Current PIN is incorrect.");
+                return;
+              }
+
+              await _appLockService.setPin(
+                uid: u.uid,
+                pin: newPin,
+                biometricEnabled: _biometricEnabled,
+              );
+
+              if (!mounted) return;
+              Navigator.pop(context);
+              setState(() => _lockBusy = false);
+              _toast("App PIN changed ✅");
+            },
+            child: const Text("Update"),
+          ),
+        ],
+      ),
+    );
+
+    currentCtrl.dispose();
+    newCtrl.dispose();
+    confirmCtrl.dispose();
+  }
+
+  Future<void> _resetPinOnDevice() async {
+    final u = FirebaseAuth.instance.currentUser;
+    if (u == null) return;
+
+    final confirmed =
+        await showDialog<bool>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text("Reset PIN on this device?"),
+            content: const Text(
+              "This clears your local app PIN and requires immediate setup again.",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text("Cancel"),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text("Reset"),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!confirmed) return;
+
+    setState(() => _lockBusy = true);
+    await _appLockService.resetPinOnDevice(u.uid);
+
+    if (!mounted) return;
+    setState(() => _lockBusy = false);
+    _toast("PIN reset. Please set a new PIN.");
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const AppAuthRoot()),
+      (route) => false,
+    );
+  }
+
+  Future<void> _toggleBiometric(bool value) async {
+    final u = FirebaseAuth.instance.currentUser;
+    if (u == null) return;
+
+    setState(() => _lockBusy = true);
+    await _appLockService.setBiometricPreference(u.uid, value);
+
+    if (!mounted) return;
+    setState(() {
+      _biometricEnabled = value;
+      _lockBusy = false;
+    });
+    _toast("Biometric preference updated.");
+  }
+
   String _initials(String nameOrEmail) {
     final t = nameOrEmail.trim();
     if (t.isEmpty) return "?";
     final parts = t.split(RegExp(r"\s+"));
-    if (parts.length == 1) return parts.first.characters.take(2).toString().toUpperCase();
-    return (parts[0].characters.first + parts[1].characters.first).toUpperCase();
+    if (parts.length == 1) {
+      return parts.first.characters.take(2).toString().toUpperCase();
+    }
+    return (parts[0].characters.first + parts[1].characters.first)
+        .toUpperCase();
   }
 
   void _toast(String msg) {
@@ -142,7 +339,8 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 
   bool get _isSuperAdmin => widget.role.toLowerCase().contains("super");
-  bool get _isAdmin => widget.role.toLowerCase().contains("admin") || _isSuperAdmin;
+  bool get _isAdmin =>
+      widget.role.toLowerCase().contains("admin") || _isSuperAdmin;
   bool get _isEmployee => widget.role.toLowerCase().contains("employee");
 
   Future<void> _saveProfile() async {
@@ -212,12 +410,17 @@ class _ProfileTabState extends State<ProfileTab> {
             TextField(
               controller: newCtrl,
               obscureText: true,
-              decoration: const InputDecoration(labelText: "New password (min 6)"),
+              decoration: const InputDecoration(
+                labelText: "New password (min 6)",
+              ),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
           ElevatedButton(
             onPressed: () async {
               final oldPass = oldCtrl.text.trim();
@@ -240,9 +443,12 @@ class _ProfileTabState extends State<ProfileTab> {
                 await u.updatePassword(newPass);
 
                 // audit
-                await FirebaseFirestore.instance.collection("users").doc(u.uid).set({
-                  "lastActivityAt": FieldValue.serverTimestamp(),
-                }, SetOptions(merge: true));
+                await FirebaseFirestore.instance
+                    .collection("users")
+                    .doc(u.uid)
+                    .set({
+                      "lastActivityAt": FieldValue.serverTimestamp(),
+                    }, SetOptions(merge: true));
 
                 if (!mounted) return;
                 setState(() => _busy = false);
@@ -354,11 +560,13 @@ class _ProfileTabState extends State<ProfileTab> {
             const SizedBox(height: 8),
             Text("Last activity: ${_fmt(_lastActivityAt)}"),
             const SizedBox(height: 12),
-        
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Close")),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Close"),
+          ),
         ],
       ),
     );
@@ -394,7 +602,9 @@ class _ProfileTabState extends State<ProfileTab> {
 
   @override
   Widget build(BuildContext context) {
-    final displayName = _nameCtrl.text.trim().isEmpty ? (widget.email) : _nameCtrl.text.trim();
+    final displayName = _nameCtrl.text.trim().isEmpty
+        ? (widget.email)
+        : _nameCtrl.text.trim();
     final initials = _initials(displayName);
 
     return ListView(
@@ -402,7 +612,9 @@ class _ProfileTabState extends State<ProfileTab> {
       children: [
         // ===== Header =====
         Card(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -416,7 +628,11 @@ class _ProfileTabState extends State<ProfileTab> {
                       // backgroundImage: (_photoUrl != null) ? NetworkImage(_photoUrl!) : null,
                       child: Text(
                         initials,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                     Positioned(
@@ -430,7 +646,11 @@ class _ProfileTabState extends State<ProfileTab> {
                             shape: BoxShape.circle,
                             color: Theme.of(context).colorScheme.primary,
                           ),
-                          child: const Icon(Icons.palette, size: 16, color: Colors.white),
+                          child: const Icon(
+                            Icons.palette,
+                            size: 16,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
@@ -459,9 +679,18 @@ class _ProfileTabState extends State<ProfileTab> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(displayName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                      Text(
+                        displayName,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       const SizedBox(height: 4),
-                      Text(widget.email, style: const TextStyle(color: Colors.black54)),
+                      Text(
+                        widget.email,
+                        style: const TextStyle(color: Colors.black54),
+                      ),
                       const SizedBox(height: 8),
                       Wrap(
                         spacing: 8,
@@ -488,19 +717,20 @@ class _ProfileTabState extends State<ProfileTab> {
 
         const SizedBox(height: 12),
 
-       
-
-        
-
         // ===== Account (editable) =====
         Card(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("Account", style: TextStyle(fontWeight: FontWeight.w800)),
+                const Text(
+                  "Account",
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: _nameCtrl,
@@ -525,7 +755,13 @@ class _ProfileTabState extends State<ProfileTab> {
                       child: ElevatedButton.icon(
                         onPressed: _busy ? null : _saveProfile,
                         icon: _busy
-                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
                             : const Icon(Icons.save),
                         label: const Text("Save"),
                       ),
@@ -547,22 +783,91 @@ class _ProfileTabState extends State<ProfileTab> {
 
         const SizedBox(height: 12),
 
-
-        // ===== Security & Logs =====
+        // ===== App Lock =====
         Card(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("Security & Activity", style: TextStyle(fontWeight: FontWeight.w800)),
+                const Text(
+                  "App Lock",
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 10),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.shield_outlined),
+                  title: const Text("PIN Status"),
+                  subtitle: Text(
+                    _pinConfigured
+                        ? "Configured on this device"
+                        : "Setup required",
+                  ),
+                ),
+                const Divider(),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.pin),
+                  title: const Text("Change PIN"),
+                  subtitle: const Text("Update your local 6-digit app PIN"),
+                  onTap: (_busy || _lockBusy || !_pinConfigured)
+                      ? null
+                      : _changePinDialog,
+                ),
+                const Divider(),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Icon(Icons.fingerprint),
+                  title: const Text("Use biometrics"),
+                  subtitle: const Text(
+                    "Fingerprint/Face unlock on this device",
+                  ),
+                  value: _biometricEnabled,
+                  onChanged: (_busy || _lockBusy || !_pinConfigured)
+                      ? null
+                      : _toggleBiometric,
+                ),
+                const Divider(),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.restart_alt),
+                  title: const Text("Reset PIN on this device"),
+                  subtitle: const Text("Force setup of a new app PIN locally"),
+                  onTap: (_busy || _lockBusy) ? null : _resetPinOnDevice,
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // ===== Security & Logs =====
+        Card(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Security & Activity",
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
                 const SizedBox(height: 10),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.history),
                   title: const Text("View my activity"),
-                  subtitle: const Text("Last login, last activity, and audit-ready info"),
+                  subtitle: const Text(
+                    "Last login, last activity, and audit-ready info",
+                  ),
                   onTap: _busy ? null : _openActivityLog,
                 ),
                 const Divider(),
@@ -570,8 +875,12 @@ class _ProfileTabState extends State<ProfileTab> {
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.privacy_tip_outlined),
                   title: const Text("Privacy"),
-                  subtitle: const Text("Your data is stored securely in Firebase (Firestore)."),
-                  onTap: () => _toast("Add a Privacy page if your dissertation requires it."),
+                  subtitle: const Text(
+                    "Your data is stored securely in Firebase (Firestore).",
+                  ),
+                  onTap: () => _toast(
+                    "Add a Privacy page if your dissertation requires it.",
+                  ),
                 ),
               ],
             ),

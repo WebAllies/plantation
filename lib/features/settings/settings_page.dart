@@ -4,8 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:iot_aqua_app/ai/superadmin_ai_reports_page.dart';
 import 'package:iot_aqua_app/core/device/device_selector_header.dart';
 import 'package:iot_aqua_app/core/services/auth_service.dart';
+import 'package:iot_aqua_app/features/auth/app_auth_root.dart';
 
-import '../auth/login_page.dart';
 import '../sensors/sensor_settings_page.dart';
 
 import 'tabs/profile_tab.dart';
@@ -81,7 +81,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const LoginPage()),
+      MaterialPageRoute(builder: (_) => const AppAuthRoot()),
       (route) => false,
     );
   }
