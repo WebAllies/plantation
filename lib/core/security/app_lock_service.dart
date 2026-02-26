@@ -287,6 +287,23 @@ class AppLockService {
     await _writeInt(_k(uid, 'pin_version'), version);
   }
 
+  Future<void> clearLocalPinForLogout(
+    String uid, {
+    bool clearBiometricPreference = true,
+  }) async {
+    try {
+      await _clearLocalPin(uid);
+    } catch (_) {}
+    try {
+      await _store.delete(_k(uid, 'pin_version'));
+    } catch (_) {}
+    if (clearBiometricPreference) {
+      try {
+        await _store.delete(_k(uid, 'biometric_enabled'));
+      } catch (_) {}
+    }
+  }
+
   Future<AppLockVerifyResult> verifyPin({
     required String uid,
     required String pin,

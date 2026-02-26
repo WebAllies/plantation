@@ -145,5 +145,46 @@ void main() {
       final verify = await service.verifyPin(uid: uid, pin: '123456');
       expect(verify.status, AppLockVerifyStatus.success);
     });
+
+    test(
+      'clearLocalPinForLogout forces setup and clears local lock data',
+      () async {
+        await service.setPin(uid: uid, pin: '123456', biometricEnabled: true);
+        await store.write('app_lock.$uid.failed_attempts', '4');
+        await store.write(
+          'app_lock.$uid.lockout_until_ms',
+          DateTime.now()
+              .toUtc()
+              .add(const Duration(minutes: 1))
+              .millisecondsSinceEpoch
+              .toString(),
+        );
+        await store.write('app_lock.$uid.pin_version', '9');
+
+        await service.clearLocalPinForLogout(uid);
+
+        expect(await store.read('app_lock.$uid.pin_hash'), isNull);
+        expect(await store.read('app_lock.$uid.pin_salt'), isNull);
+        expect(await store.read('app_lock.$uid.pin_version'), isNull);
+        expect(await store.read('app_lock.$uid.biometric_enabled'), isNull);
+        expect(await store.read('app_lock.$uid.failed_attempts'), '0');
+        expect(await store.read('app_lock.$uid.lockout_until_ms'), '0');
+
+        final state = await service.getLockState(uid);
+        expect(state.needsSetup, isTrue);
+      },
+    );
+
+    test('clearLocalPinForLogout can preserve biometric preference', () async {
+      await service.setPin(uid: uid, pin: '123456', biometricEnabled: true);
+
+      await service.clearLocalPinForLogout(
+        uid,
+        clearBiometricPreference: false,
+      );
+
+      expect(await store.read('app_lock.$uid.pin_hash'), isNull);
+      expect(await store.read('app_lock.$uid.biometric_enabled'), '1');
+    });
   });
 }
