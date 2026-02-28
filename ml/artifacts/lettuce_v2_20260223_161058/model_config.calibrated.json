@@ -1,0 +1,19 @@
+{
+  "modelVersion": "lettuce_v2_20260223_161058",
+  "inputSize": 224,
+  "normalization": "[-1,1]",
+  "classThresholds": {
+    "healthy": 0.4,
+    "nitrogen_deficiency": 0.4,
+    "phosphorus_deficiency": 0.4,
+    "potassium_deficiency": 0.4,
+    "fungal_mildew": 0.4
+  },
+  "binaryMap": {
+    "healthy": "Healthy",
+    "nitrogen_deficiency": "Unhealthy",
+    "phosphorus_deficiency": "Unhealthy",
+    "potassium_deficiency": "Unhealthy",
+    "fungal_mildew": "Unhealthy"
+  }
+}

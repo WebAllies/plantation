@@ -1,0 +1,9 @@
+{
+  "run_dir": "/mnt/e/shuaib/plantation/ml/artifacts/lettuce_v2_20260223_172433",
+  "train_samples": 296,
+  "train_samples_effective": 347,
+  "val_samples": 60,
+  "test_samples": 71,
+  "macro_f1_test": 0.8816518218623483,
+  "binary_f1_test": 1.0
+}

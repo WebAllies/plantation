@@ -1,0 +1,486 @@
+image_path,label,resolved_path,exists,width,height,brightness,sharpness,file_hash,reasons,keep
+fungal_mildew/01.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/01.jpg,True,500,315,0.5335984772326899,1761.6298828125,7dd7776cee2684c1a3c63afadb6a2e0c,[],True
+fungal_mildew/02.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/02.jpg,True,500,382,0.4693778542911305,948.547119140625,951a1ed59921714c873eb132aba5f56f,[],True
+fungal_mildew/03.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/03.jpg,True,640,467,0.4039496328316483,1986.3447265625,28f5c09e49ed2dde23a712173c30edd0,[],True
+fungal_mildew/04.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/04.jpg,True,640,745,0.36404101801853556,539.6210327148438,c060d2719fbc56b52ed551eab66e235f,[],True
+fungal_mildew/05.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/05.jpg,True,640,827,0.3281812480851716,1189.15478515625,c9d88c7e88497250422f635e80bc0ad3,[],True
+fungal_mildew/06.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/06.jpg,True,640,480,0.44767758238549327,2939.5576171875,c6a7ffdb7b255d3e14d378834335eaa3,[],True
+fungal_mildew/07.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/07.jpg,True,640,420,0.42992251527075676,1607.439208984375,37f6facce4b951fe67ddc77e5c15fee1,[],True
+fungal_mildew/08.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/08.jpg,True,777,525,0.470460480334712,296.28564453125,3e36cf400ed027f93128410435c42573,[],True
+fungal_mildew/09.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/09.jpg,True,200,200,0.7450519636565563,843.1433715820312,5dff16b75851a058b1153c396c05a33f,[],True
+fungal_mildew/10.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/10.jpg,True,251,201,0.4610044890759038,1246.488525390625,903c83e1e9f3737ffed44aa1ea9097c9,[],True
+fungal_mildew/11.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/11.jpg,True,600,400,0.5410838407628676,1401.132568359375,52151e6e87ae2a846c06dae9e5ebaea5,[],True
+fungal_mildew/12.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/12.jpg,True,407,273,0.5745169246897978,972.0235595703125,f378b5e3273ae7bbeeebb5210359ac03,[],True
+fungal_mildew/13.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/13.jpg,True,251,201,0.5577963436351103,596.2877197265625,e388e7e50cc99611a6a04e455b6841b3,[],True
+fungal_mildew/14.png,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/14.png,True,525,393,0.4404714546951593,560.3897094726562,0ee93b3815dc9416cd6642a5cb23f746,[],True
+fungal_mildew/15.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/15.jpg,True,640,480,0.5909658394607843,143.28025817871094,567c8003de772583bfb67558f95a6714,[],True
+fungal_mildew/16.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/16.jpg,True,500,376,0.43160283705767466,259.8519592285156,c3baa61c3caa8d54000e56900cd8a3c2,[],True
+fungal_mildew/17.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/17.jpg,True,940,474,0.4243397731407016,572.3995971679688,f4d24048a98c3942e5dfb64a3c2c144a,[],True
+fungal_mildew/18.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/18.jpg,True,1292,1390,0.44894295486749386,521.8663330078125,0c87576d31b5e992848ed639d6f09c4a,[],True
+fungal_mildew/19.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/19.jpg,True,259,194,0.6222559311810661,1604.09228515625,8b050290f0ea77b29414b948e51dae7e,[],True
+fungal_mildew/20.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/20.jpg,True,1280,720,0.5171195235906862,319.167236328125,ae6250121b479b7330ed63fa4318c379,[],True
+fungal_mildew/21.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/21.jpg,True,1024,769,0.42586637010761336,584.9734497070312,0e28b796e7cb7f880e128a3fb0906798,[],True
+fungal_mildew/22.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/22.jpg,True,432,288,0.5593269497740503,553.5123291015625,d04d6e85b5fc236ab8ac9208816fa5e8,[],True
+fungal_mildew/23.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/23.jpg,True,500,335,0.6144306257659313,265.9994201660156,02c4f0989b6d66ca8eafebddeed987a9,[],True
+fungal_mildew/24.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/24.jpg,True,900,598,0.5512224384382659,211.44107055664062,1e1abf3675203827959dac82a6ec2e70,[],True
+fungal_mildew/25.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/25.jpg,True,194,259,0.49341343898399204,354.0620422363281,348f92e1939f45d3d3793c72f42be545,[],True
+fungal_mildew/26.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/26.jpg,True,783,513,0.5173694685393688,203.73507690429688,2397be4434ea06a7c3220ab8fce2476a,[],True
+fungal_mildew/27.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/27.jpg,True,933,674,0.31263685039445466,359.101318359375,82726c8bae19293ec3dbaf4563f68fec,[],True
+fungal_mildew/28.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/28.jpg,True,300,225,0.1732747096641391,423.8503112792969,d5df5c12bb46517d83350c1a6e6532c4,[],True
+fungal_mildew/29.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/29.jpg,True,276,183,0.46316911285998774,629.013671875,dee96e7bbd77824fd37882547067019e,[],True
+fungal_mildew/30.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/30.jpg,True,590,332,0.5141413669960172,476.0697021484375,b4e456fc9be8ccc9c1b00b8468d672c0,[],True
+fungal_mildew/p01.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p01.jpg,True,500,375,0.4204467175053615,982.89306640625,708ffc958459785ed6e5b8a29c482bfa,[],True
+fungal_mildew/p02.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p02.jpg,True,1200,900,0.4386045867321538,676.679443359375,92b34fe15a028bd051f37076be660083,[],True
+fungal_mildew/p03.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p03.jpg,True,500,375,0.4391818177466299,1492.2601318359375,88ccb27063d57726a8e61cc9e7e9f6c6,[],True
+fungal_mildew/p04.JPG,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p04.JPG,True,900,1200,0.5450115727443321,165.0906219482422,f83dc9a42d46664b1bcd9ce06fa2c53c,[],True
+fungal_mildew/p05.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p05.jpg,True,1200,900,0.44069510067210477,337.2891845703125,1029fc2fc21acd253e373b671b8f8589,[],True
+fungal_mildew/p06.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p06.jpg,True,600,400,0.43452621160768995,1018.5238647460938,3ac5b4e35ec991c28c1808b2b37a8ec7,[],True
+fungal_mildew/p07.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p07.jpg,True,252,200,0.4425782745959712,2352.7431640625,827f3fe06666baa65371075137fb79d2,[],True
+fungal_mildew/p08.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p08.jpg,True,391,129,0.5423807181564032,438.8295593261719,e25076454efbada0f6be2fbb9e762356,[],True
+fungal_mildew/p09.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p09.jpg,True,271,186,0.42012365004595587,1383.424072265625,67350184a30f9a2224606f91e22428dd,[],True
+fungal_mildew/p10.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p10.jpg,True,783,522,0.4356877046472886,311.1553039550781,7d9f450d30ef8f1be59d5438d7a18e96,[],True
+fungal_mildew/p11.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p11.jpg,True,768,525,0.4615364822686887,247.4871368408203,40a5bdb3018c6af4811f291fd396a63b,[],True
+fungal_mildew/p12.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p12.jpg,True,500,332,0.42828635421453737,256.8136291503906,3a1e07b293c19d85ee17b42a5076a915,[],True
+fungal_mildew/p13.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p13.jpg,True,620,412,0.462992888805913,276.3095703125,e59ecef906789f8450a440f756c216e6,[],True
+fungal_mildew/p14.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p14.jpg,True,800,724,0.7256325516046263,467.3535461425781,cfae777a20743cc915184c75d47090fd,[],True
+fungal_mildew/p15.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p15.jpg,True,358,238,0.5919412650314032,1214.105224609375,c572ee421ed0d4beace8f4a0afab0cea,[],True
+fungal_mildew/p17.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p17.jpg,True,640,480,0.6513135723039216,526.3587646484375,32f6660bf2ec41890f6a58cc76734a6d,[],True
+fungal_mildew/p18.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p18.jpg,True,275,183,0.40485986447801775,957.32080078125,bdafb7364566b97e29704e6cb9eb9d0d,[],True
+fungal_mildew/p19.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p19.jpg,True,716,468,0.425550064386106,560.2839965820312,ef47a7fdc83797a613319944eafa57b9,[],True
+fungal_mildew/p20.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p20.jpg,True,800,516,0.42452150232651653,261.45086669921875,02931cbe7aa730be7293f3b8cc3f37e5,[],True
+fungal_mildew/p21.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p21.jpg,True,800,506,0.4724498673981311,171.02947998046875,cbfcc9912e1ebdb674c91935179fe747,[],True
+fungal_mildew/pml (1).jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/pml (1).jpg,True,1200,900,0.4386045867321538,676.679443359375,92b34fe15a028bd051f37076be660083,"[""duplicate_exact""]",False
+fungal_mildew/pml (10).jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/pml (10).jpg,True,620,412,0.462992888805913,276.3095703125,e59ecef906789f8450a440f756c216e6,"[""duplicate_exact""]",False
+fungal_mildew/pml (11).jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/pml (11).jpg,True,800,724,0.7256325516046263,467.3535461425781,cfae777a20743cc915184c75d47090fd,"[""duplicate_exact""]",False
+fungal_mildew/pml (12).jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/pml (12).jpg,True,358,238,0.5919412650314032,1214.105224609375,c572ee421ed0d4beace8f4a0afab0cea,"[""duplicate_exact""]",False
+fungal_mildew/pml (14).jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/pml (14).jpg,True,640,480,0.6513135723039216,526.3587646484375,32f6660bf2ec41890f6a58cc76734a6d,"[""duplicate_exact""]",False
+fungal_mildew/pml (15).jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/pml (15).jpg,True,275,183,0.40485986447801775,957.32080078125,bdafb7364566b97e29704e6cb9eb9d0d,"[""duplicate_exact""]",False
+fungal_mildew/pml (16).jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/pml (16).jpg,True,716,468,0.425550064386106,560.2839965820312,ef47a7fdc83797a613319944eafa57b9,"[""duplicate_exact""]",False
+fungal_mildew/pml (17).jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/pml (17).jpg,True,800,516,0.42452150232651653,261.45086669921875,02931cbe7aa730be7293f3b8cc3f37e5,"[""duplicate_exact""]",False
+fungal_mildew/pml (18).jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/pml (18).jpg,True,800,506,0.4724498673981311,171.02947998046875,cbfcc9912e1ebdb674c91935179fe747,"[""duplicate_exact""]",False
+fungal_mildew/pml (2).JPG,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/pml (2).JPG,True,900,1200,0.5450115727443321,165.0906219482422,f83dc9a42d46664b1bcd9ce06fa2c53c,"[""duplicate_exact""]",False
+fungal_mildew/pml (3).jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/pml (3).jpg,True,600,400,0.43452621160768995,1018.5238647460938,3ac5b4e35ec991c28c1808b2b37a8ec7,"[""duplicate_exact""]",False
+fungal_mildew/pml (4).jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/pml (4).jpg,True,252,200,0.4425782745959712,2352.7431640625,827f3fe06666baa65371075137fb79d2,"[""duplicate_exact""]",False
+fungal_mildew/pml (5).jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/pml (5).jpg,True,391,129,0.5423807181564032,438.8295593261719,e25076454efbada0f6be2fbb9e762356,"[""duplicate_exact""]",False
+fungal_mildew/pml (6).jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/pml (6).jpg,True,271,186,0.42012365004595587,1383.424072265625,67350184a30f9a2224606f91e22428dd,"[""duplicate_exact""]",False
+fungal_mildew/pml (7).jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/pml (7).jpg,True,783,522,0.4356877046472886,311.1553039550781,7d9f450d30ef8f1be59d5438d7a18e96,"[""duplicate_exact""]",False
+fungal_mildew/pml (8).jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/pml (8).jpg,True,768,525,0.4615364822686887,247.4871368408203,40a5bdb3018c6af4811f291fd396a63b,"[""duplicate_exact""]",False
+fungal_mildew/pml (9).jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/pml (9).jpg,True,500,332,0.42828635421453737,256.8136291503906,3a1e07b293c19d85ee17b42a5076a915,"[""duplicate_exact""]",False
+fungal_mildew/s01.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/s01.jpg,True,1200,770,0.5359484504250919,58.263267517089844,76245c73bf20da276545150c01217e4b,[],True
+fungal_mildew/s02.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/s02.jpg,True,450,330,0.5198896221086091,983.8634033203125,14e309a45d3945275abfb535fe325b47,[],True
+fungal_mildew/s03.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/s03.jpg,True,900,600,0.568537872912837,213.12684631347656,55b1e31eefe26a766a2ad5f22822247d,[],True
+fungal_mildew/s04.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/s04.jpg,True,274,184,0.4931947296740962,1314.9892578125,c7d19b569dd5f05ce6f35fc2598098ed,[],True
+fungal_mildew/s05.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/s05.jpg,True,900,591,0.5468015184589461,171.20645141601562,e47853504fc49bcafcb8d6c161f1161b,[],True
+fungal_mildew/s06.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/s06.jpg,True,1200,770,0.5359484504250919,58.263267517089844,76245c73bf20da276545150c01217e4b,"[""duplicate_exact""]",False
+fungal_mildew/s07.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/s07.jpg,True,262,192,0.5202663646024817,1766.411865234375,51e9157ae85bd01cb79cc77cfc466f4b,[],True
+fungal_mildew/s08.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/s08.jpg,True,262,192,0.6032202627144608,1693.301513671875,7937edc1b1c53c97d51a60083e613bf5,[],True
+fungal_mildew/s09.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/s09.jpg,True,400,300,0.5477152506510417,2173.931640625,446c287f89f51b3ba3443e66d34170cb,[],True
+fungal_mildew/s10.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/s10.jpg,True,225,224,0.5564615885416667,1307.2589111328125,bd710e9d95366beb52db0824ed013992,[],True
+fungal_mildew/s11.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/s11.jpg,True,699,479,0.35353947059780944,132.81243896484375,12cf9c9f757f71221597f314acc9abf5,[],True
+fungal_mildew/s12.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/s12.jpg,True,251,300,0.4111352658739277,1062.9991455078125,c6967236f2361bbe9b2796f0fb25804c,[],True
+fungal_mildew/s13.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/s13.jpg,True,500,375,0.4784834020278033,717.230224609375,8115f9b5b5478da9f74e3dbdbda49b61,[],True
+fungal_mildew/s14.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/s14.jpg,True,285,177,0.5202680999157475,1040.4512939453125,cde45738f636badc438edb4ef95e56e3,[],True
+fungal_mildew/s15.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/s15.jpg,True,417,600,0.2902283313227635,149.30284118652344,aaa0810beca94e313bf32efbddda6ce3,[],True
+fungal_mildew/s16.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/s16.jpg,True,600,431,0.42163468903186274,650.730712890625,a03d24366bae09508ac811d2e0f0b760,[],True
+fungal_mildew/s17.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/s17.jpg,True,900,600,0.5684609805836397,336.8306579589844,c2b5f2dd6488a2a879155b49594f3937,[],True
+fungal_mildew/s18.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/s18.jpg,True,1200,770,0.5359004001991422,127.30146026611328,1cae07beee1ffb894f8acbb9c6afa69c,[],True
+fungal_mildew/s19.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/s19.jpg,True,450,330,0.5197239894492953,1146.420166015625,baca0429fb7d9093a8f17d7d531eeabd,[],True
+fungal_mildew/wl01.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/wl01.jpg,True,276,183,0.5686775357115502,2137.446044921875,0e87ac814edcbc7d2c406ce53546bc49,[],True
+fungal_mildew/wl02.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/wl02.jpg,True,474,314,0.6540009741689644,344.3025207519531,47a383dac9f53b0bf3dc186d7d91f9e1,[],True
+fungal_mildew/wl03.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/wl03.jpg,True,474,327,0.5187488630706188,8517.1650390625,26bc7ed1090d53c0685777852cafc456,[],True
+fungal_mildew/wl04.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/wl04.jpg,True,474,295,0.417656722723269,398.8155517578125,b58ee31363cd9e85463002e984524d98,[],True
+fungal_mildew/wl05.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/wl05.jpg,True,520,390,0.458993470435049,600.437255859375,4d9b327da5306a95709f727455e58982,[],True
+fungal_mildew/wl06.jpg,fungal_mildew,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/wl06.jpg,True,520,390,0.5420916389016545,151.92977905273438,06162ed07383490cf090e40aeb7a3944,[],True
+healthy/h (1).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1).jpg,True,590,981,0.6174434287875307,66.99370574951172,8130874a9ac29adddc37c779bf90d02f,[],True
+healthy/h (10).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (10).JPG,True,2207,2049,0.5812793208103554,55.382511138916016,0191a9ff12806bbd27ad3a3716e422d1,[],True
+healthy/h (100).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (100).JPG,True,2586,2999,0.5210896211511948,33.18635940551758,bc74f6fa2ab73275970f3aa80b88d854,[],True
+healthy/h (1000).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1000).JPG,True,2705,3077,0.5106065937117035,57.133338928222656,23e3816e4e5b29219ee77978d4908e3b,[],True
+healthy/h (1001).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1001).JPG,True,4032,3024,0.6322622860179228,16.400047302246094,c4b87c49d7347b7291819861c1117758,"[""low_sharpness""]",False
+healthy/h (1002).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1002).JPG,True,4032,3024,0.6011471617455576,24.772197723388672,da6099d3421e86da4793ac358683dd22,"[""low_sharpness""]",False
+healthy/h (1003).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1003).JPG,True,4032,3024,0.48338733747893686,27.351804733276367,2cb73392035393709095d922a6abe4fb,[],True
+healthy/h (1004).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1004).JPG,True,4032,3024,0.5355782901539522,26.01000213623047,754fadf1428f319583c477f9f230919f,[],True
+healthy/h (1005).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1005).JPG,True,4032,3024,0.5338168275122549,21.859254837036133,a9b5fa20d0780993eab989cbb304089d,"[""low_sharpness""]",False
+healthy/h (1006).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1006).JPG,True,4032,3024,0.564605952244179,23.612396240234375,8f2dffc5c948e8022b59b44197580393,"[""low_sharpness""]",False
+healthy/h (1007).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1007).JPG,True,4032,3024,0.5201648786956189,19.321186065673828,52d2da7ceca6fff5e90cf64d555f07b2,"[""low_sharpness""]",False
+healthy/h (1008).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1008).JPG,True,4032,3024,0.5524119657628677,18.649749755859375,b78092606c908161dab17ec040bceda3,"[""low_sharpness""]",False
+healthy/h (1009).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1009).JPG,True,4032,3024,0.5744102926815258,26.555234909057617,c2ac5978286a56972b36ed85a4fc8964,[],True
+healthy/h (101).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (101).JPG,True,931,992,0.4150997685451134,74.14556884765625,782baf4bce383bacfab4f30c46f32ccf,[],True
+healthy/h (1010).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1010).JPG,True,4032,3024,0.5602242264093137,26.136676788330078,8130504fb9b98dbec97be2eb910a6cde,[],True
+healthy/h (1011).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1011).JPG,True,4032,3024,0.5971101050283395,26.686166763305664,8c2ace94410cb49a1284fbeec6f7e4c4,[],True
+healthy/h (1012).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1012).JPG,True,4032,3024,0.6098712995940564,21.750152587890625,2dd703f256eb3d2d42c07a82e92c570f,"[""low_sharpness""]",False
+healthy/h (1013).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1013).JPG,True,4032,3024,0.552381747376685,24.497079849243164,5360ed5f10cc01868a18f3d0ff85cb16,"[""low_sharpness""]",False
+healthy/h (1014).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1014).JPG,True,4032,3024,0.547169345032935,24.45996856689453,a2eda3dc6d467fb81dbdd53112c60fe8,"[""low_sharpness""]",False
+healthy/h (1015).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1015).JPG,True,4032,3024,0.5358214733647365,18.59475326538086,3d9ce47e31ab4f1fea3caf928d938cb3,"[""low_sharpness""]",False
+healthy/h (1016).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1016).JPG,True,4032,3024,0.5315219654756433,21.56087303161621,82c756ade603f4ed2925cf93da36fec4,"[""low_sharpness""]",False
+healthy/h (1017).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1017).JPG,True,4032,3024,0.5608173445159313,30.967851638793945,e98313f45443812eee54459cea9f4f3f,[],True
+healthy/h (1018).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1018).JPG,True,2798,2102,0.4278844795975031,47.29076385498047,b7759fdc4c29cf8309e04d41f23b4e2b,[],True
+healthy/h (1019).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1019).JPG,True,2072,2560,0.4387935264437806,43.99703598022461,039f404af7a2cd984485e19538b27da9,[],True
+healthy/h (102).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (102).JPG,True,1295,1282,0.5264467127182905,72.8211898803711,06f8597aba176f70d185fc1e64770ca6,[],True
+healthy/h (1020).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1020).JPG,True,2768,3836,0.5235791973039216,27.840559005737305,b09892f06245acf04e16958f932882cb,[],True
+healthy/h (1021).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1021).JPG,True,4032,3024,0.5313672234030331,24.409318923950195,ae69ef9149b585322948ed6ff57900e1,"[""low_sharpness""]",False
+healthy/h (1022).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1022).JPG,True,1478,2168,0.5827457801968443,63.475364685058594,feca17fb58f2bc1c769c9d837351d512,[],True
+healthy/h (1023).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1023).JPG,True,2545,3836,0.4652161242915135,46.795928955078125,6b6bfa04f7b1d1179086320fbf1603c1,[],True
+healthy/h (1024).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1024).JPG,True,4032,3024,0.5317453421798407,30.6219425201416,6ca8c2f9e8e3a44635c68eeade752cc2,[],True
+healthy/h (1025).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1025).JPG,True,4032,3024,0.5209026261871936,30.529373168945312,2c3efa711c0a4356ea0ca620d2220886,[],True
+healthy/h (1026).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1026).JPG,True,4032,3024,0.5486339494293812,40.424564361572266,f6bec76e8931543584d6db0cca0b1f6d,[],True
+healthy/h (103).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (103).JPG,True,1486,1600,0.48450484930300247,39.67377471923828,0b1237ddff600168cb613c33cab9fa69,[],True
+healthy/h (1032).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1032).JPG,True,4032,3024,0.5509941549862132,28.96368980407715,f9d894a2affb66ff92178ee78806e751,[],True
+healthy/h (1033).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1033).JPG,True,3024,3579,0.5440532011144301,30.817724227905273,83d0aa530c8575c948a149791d6293c0,[],True
+healthy/h (1034).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1034).JPG,True,2930,3505,0.5222900989008885,45.01911163330078,db94bbb46a07be1b6c08be57b31b6d54,[],True
+healthy/h (1035).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1035).JPG,True,4032,3024,0.5939474068435968,32.50973129272461,7aeecc46d157592b38655bb75c80ca4f,[],True
+healthy/h (1036).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1036).JPG,True,4032,3024,0.521420108570772,37.64204406738281,4ed9ceaf0888770de5f5de8fbc0168fb,[],True
+healthy/h (1037).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1037).JPG,True,1755,3512,0.564918248793658,46.44480514526367,b3a7ca3e3ac3ebb90033ba68c6fa7ff5,[],True
+healthy/h (1038).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1038).JPG,True,2153,3371,0.4368170046338848,39.09108352661133,f973eabc0973e4ea1879ed6e67d55c54,[],True
+healthy/h (1039).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1039).JPG,True,3024,4032,0.5530886182598039,28.835647583007812,2a329e60b7a9189cf706f611fe20559c,[],True
+healthy/h (104).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (104).JPG,True,1397,1864,0.5367651845894608,36.97513198852539,196b5f0be32e4f69fdbe2ff77acb2e7d,[],True
+healthy/h (1040).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1040).JPG,True,4032,3024,0.5565749224494485,28.525365829467773,9c3a92cfab496080c216bdbc11e48cf5,[],True
+healthy/h (1041).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1041).JPG,True,4032,3024,0.521545170802696,28.382469177246094,b19228b8e06b7a94e5469cde3013b23c,[],True
+healthy/h (1042).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1042).JPG,True,2126,2999,0.5353647269454657,37.190250396728516,519ecbdbcb115fb68bbe1e2394982c6b,[],True
+healthy/h (1043).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1043).JPG,True,4032,3024,0.5087130079082415,37.857765197753906,1d3ba084c3d94556d79a7deff45952d9,[],True
+healthy/h (1044).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1044).JPG,True,4032,3024,0.5831964829388787,23.385751724243164,b879406c5e283ffb20e820691300d540,"[""low_sharpness""]",False
+healthy/h (1045).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1045).JPG,True,4032,3024,0.4829282274433211,37.44316101074219,7976345a3acb2d9ddbe1413662ecc89d,[],True
+healthy/h (1046).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1046).JPG,True,3024,3079,0.591387939453125,49.41154479980469,a99384c05ea4d1ab43b484ab5d4b4710,[],True
+healthy/h (1047).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1047).JPG,True,1944,3148,0.5408659093520221,38.62930679321289,4bfa7616bf3f45f9d84505d241d01f3a,[],True
+healthy/h (1048).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1048).JPG,True,3024,2958,0.4063327864104626,46.75050735473633,5a362fc368483faaa3b5e9eefe61c77c,[],True
+healthy/h (1049).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1049).JPG,True,1884,1675,0.6057760201248468,69.85098266601562,dca163ffd1fff4f576ccfcf35038939b,[],True
+healthy/h (105).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (105).JPG,True,1437,1661,0.49974263509114586,43.41105651855469,a4e042bb43adc6def59a8631bbd0f095,[],True
+healthy/h (1050).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1050).JPG,True,4032,3024,0.5697238099341299,28.880962371826172,8afdc03a3fa76a630884a181840b43fd,[],True
+healthy/h (1051).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1051).JPG,True,4032,3024,0.5490674785539216,24.241775512695312,899faf2cedfb8d7e9a974127bae92be7,"[""low_sharpness""]",False
+healthy/h (1052).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1052).JPG,True,4032,3024,0.5135665594362745,22.039714813232422,e24dd271e08d075fe53d518eabdb4adc,"[""low_sharpness""]",False
+healthy/h (1053).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1053).JPG,True,4032,3024,0.5132191975911459,30.846521377563477,0874d77bea0bedda3731c03761dc68fb,[],True
+healthy/h (1054).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1054).JPG,True,4032,3024,0.5132640165441177,27.652027130126953,279241fd0f6724ab318b6d8a5d39b204,[],True
+healthy/h (1055).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1055).JPG,True,4032,3024,0.522950714709712,38.04289627075195,58d6641b44058139b81d0ff058e9399c,[],True
+healthy/h (1056).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1056).JPG,True,2862,3188,0.5062404856962316,38.371612548828125,a4bbc8a4f30ef58475c0978286a68822,[],True
+healthy/h (1057).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1057).JPG,True,4032,3024,0.4727032829733456,35.908042907714844,b9c4d1f07ed47dc3002dbc0bb647d620,[],True
+healthy/h (1058).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1058).JPG,True,3024,2087,0.5742153990502451,83.83667755126953,ee4024628413cd731dbe78a73152e667,[],True
+healthy/h (1059).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1059).JPG,True,3010,2999,0.5715236888212316,61.295108795166016,7941b86e22f503baa6ab5bc92545d7f6,[],True
+healthy/h (106).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (106).JPG,True,1343,1810,0.512950283873315,43.21285629272461,68ce673bee32f4498fb23cf233a70cd1,[],True
+healthy/h (1060).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1060).JPG,True,1175,1709,0.49594023461435355,66.65023040771484,0dec976926d96657c30f9687eddd1ac5,[],True
+healthy/h (1061).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1061).JPG,True,850,2559,0.5656302059397978,45.18488693237305,9786f2e94f052b8f6fb8bb4ff1ddc56e,[],True
+healthy/h (1062).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1062).JPG,True,1114,2398,0.5693312701056985,64.43859100341797,3903ff3ca3a74a8f5abcf568c831e98b,[],True
+healthy/h (1063).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1063).JPG,True,2368,2239,0.4762993906058517,52.029823303222656,73ea88c3823c676b258887b8859cb8d9,[],True
+healthy/h (1064).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1064).JPG,True,2950,3404,0.5687126608455882,57.350093841552734,f991fb1f8688488ef23c9573fb21ca37,[],True
+healthy/h (1065).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1065).JPG,True,4032,3024,0.5734600590724571,54.66464614868164,1489a7645042084e6fc15545a1bdc2a8,[],True
+healthy/h (1066).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1066).JPG,True,2801,3661,0.5705108642578125,65.16104125976562,8d211f20611aebb976c08bfa03f7f4a5,[],True
+healthy/h (1067).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1067).JPG,True,2474,2842,0.5385234159581801,65.10005187988281,89607e269b701d69a5c39cbbbbf674ce,[],True
+healthy/h (1068).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1068).JPG,True,1600,1904,0.4830674414541207,48.75812530517578,180dd285f984ad10f41a19a36c93ffe1,[],True
+healthy/h (1069).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1069).JPG,True,4032,3024,0.5448686786726409,26.108741760253906,0a071734c9a49793acb330288cd3431a,[],True
+healthy/h (107).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (107).JPG,True,632,1357,0.43758491067325367,67.56197357177734,6c14ed60d314e34a2871fd6d5bb84e0b,[],True
+healthy/h (1070).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1070).JPG,True,4032,3024,0.5150789747051164,35.05998229980469,82fcf52fc1e1a64502996f4089b60ad5,[],True
+healthy/h (1071).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1071).JPG,True,4032,3024,0.5190501493566176,28.887514114379883,3c0ced00ce18caed17c219624e5c758d,[],True
+healthy/h (1072).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1072).jpg,True,474,474,0.7289825439453125,435.5823669433594,a14e123dc1133be12bf3c7491a3f680b,[],True
+healthy/h (1073).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1073).jpg,True,474,322,0.6162997376685049,1312.308349609375,4c90699f8b20501526836183bc6447e3,[],True
+healthy/h (1074).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1074).jpg,True,474,355,0.4568709728764553,1662.829345703125,76fd7cbe95012d93840e696f9a6a9559,[],True
+healthy/h (1075).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1075).jpg,True,474,322,0.577700985179228,1001.3507080078125,430ee463733e578278ce889b4fc726a6,[],True
+healthy/h (1076).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1076).jpg,True,474,317,0.4927253274356618,725.1331176757812,c2236b0a689b0c4427e3f27545f758d3,[],True
+healthy/h (1077).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1077).jpg,True,474,355,0.44856797760608147,923.0413818359375,b51355ce2c9fa1d25b8e8f3304665576,[],True
+healthy/h (1078).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1078).jpg,True,474,355,0.5372815898820466,1856.1431884765625,475a4d6a1ae7c6c4964e1f22d890c70c,[],True
+healthy/h (1079).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1079).jpg,True,474,323,0.5228060254863665,1620.678466796875,7332a9c55e4ed55a9d14956e4e564cef,[],True
+healthy/h (108).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (108).JPG,True,1599,1499,0.5326995849609375,56.40018081665039,241f9c4e7958791f158f4ac2618a01f5,[],True
+healthy/h (1080).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1080).jpg,True,474,316,0.5824684292662378,536.0237426757812,b18223fd993de7bf1e1472461d5fc283,[],True
+healthy/h (1081).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1081).jpg,True,474,354,0.42918464810240503,676.8018188476562,c29234c883f525d167d696dee91498be,[],True
+healthy/h (1082).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1082).jpg,True,474,355,0.38865494073606005,201.90817260742188,8ad39deb427683bbaea8f69c2e1bf389,[],True
+healthy/h (1083).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1083).jpg,True,474,314,0.35473195992264095,933.7406616210938,e19146d9fe4d520ad65bc77833840a87,[],True
+healthy/h (1084).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1084).jpg,True,474,355,0.5217674105775123,1095.631591796875,a7c7c9a5cf742e96a13459f4df2825c2,[],True
+healthy/h (1085).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1085).jpg,True,474,355,0.40599652458639707,700.3837890625,c34762a8363009d79c3dcdc2f304602d,[],True
+healthy/h (1086).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1086).jpg,True,474,518,0.634710813036152,1225.445068359375,7666e28eb99eaa44c7ba923db0cf14f6,[],True
+healthy/h (1087).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1087).jpg,True,474,315,0.5751040589575674,574.0401000976562,a4a59b7b39be7ac8ff716372a263d238,[],True
+healthy/h (1088).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1088).jpg,True,474,355,0.45062674728094365,892.0938720703125,8b0ecb51bd3308173d1768a83cf2a4a3,[],True
+healthy/h (1089).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1089).jpg,True,474,356,0.4088482127470129,2349.150634765625,188934e600ddf30aefef00ea2ce89314,[],True
+healthy/h (109).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (109).JPG,True,1092,2447,0.5118528478285845,55.550968170166016,09c4e25871b60b45b78afdbc923f3e67,[],True
+healthy/h (1090).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1090).jpg,True,474,355,0.46123863669002757,1018.9177856445312,ab637c860063463a2e303195753ca755,[],True
+healthy/h (1091).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1091).jpg,True,474,237,0.5271765017041973,495.3184814453125,ef49d9b2b0e44833dcc5bcbb9ae5b669,[],True
+healthy/h (1092).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1092).jpg,True,2280,1705,0.5954758588005514,121.9248275756836,2459e3df292b707d7d0655c1f3fca266,[],True
+healthy/h (1093).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1093).jpg,True,2278,1277,0.7540291580499388,57.763526916503906,df63ca69d50d12a76ee5070cdca590ed,[],True
+healthy/h (1094).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1094).jpg,True,1541,1456,0.6319349700329351,78.1173324584961,93e2d6a0b5c08b54c3f72b4c32047d22,[],True
+healthy/h (1095).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1095).jpg,True,851,1683,0.550163298962163,144.9946746826172,320a7d206bef9d02a30657b2f2ff8f75,[],True
+healthy/h (1096).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1096).jpg,True,1136,1734,0.59867691339231,113.48143005371094,61879a51d1cfb10f7841dacebcf8c581,[],True
+healthy/h (1097).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1097).jpg,True,1212,1141,0.5366219913258272,99.31275939941406,e4d46baf76ef5767e0d5abcdecde0ec7,[],True
+healthy/h (1098).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1098).JPG,True,1791,2067,0.5335311590456495,58.87507629394531,c62601155e75dbd647033685d10f4f16,[],True
+healthy/h (1099).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1099).jpg,True,518,1083,0.43090652765012255,64.8890380859375,7fb05b86385d336a6027ec1133e2cb7f,[],True
+healthy/h (11).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (11).JPG,True,1459,1835,0.5065226835363051,100.03440856933594,f4c151dd5b4220a49d41cb147bc7ca2d,[],True
+healthy/h (110).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (110).JPG,True,2127,2282,0.5472261316636029,31.088186264038086,a50e95dba8712b3d5baf47d0eca5f9c7,[],True
+healthy/h (1100).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1100).jpg,True,956,2472,0.5649956198299633,123.60177612304688,decce712cf24db3c961638d6d02da5ad,[],True
+healthy/h (1101).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1101).jpg,True,1073,2514,0.5689673928653493,55.7674674987793,58f75849038e01438684c250486326dd,[],True
+healthy/h (1102).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1102).jpg,True,1591,1163,0.4659933651194853,112.43978881835938,ff1d0353984ee0c50b15beb5395e79dc,[],True
+healthy/h (1103).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1103).jpg,True,1336,1874,0.4848144830441942,70.78256225585938,59ece9785ce2619db068f70ea32f2a4d,[],True
+healthy/h (1104).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1104).jpg,True,919,1165,0.4764740887810202,63.858856201171875,541e1d094d9baddcc2e5596896de6614,[],True
+healthy/h (1105).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1105).jpg,True,1515,1114,0.505364870557598,45.96466064453125,bbb67569f53f6c16ece3ee1c0461239a,[],True
+healthy/h (1106).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1106).jpg,True,1269,636,0.435211929620481,76.02965545654297,0ef3851bf3707bfcad7f4a66a22cf648,[],True
+healthy/h (1107).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1107).jpg,True,1681,1669,0.5449413224762562,81.2822036743164,566c56cfe63849c4a526c518ca7dddbb,[],True
+healthy/h (1108).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1108).jpg,True,1359,1687,0.5430260153377757,132.93089294433594,d54956565403f44dd942bb997a7ac211,[],True
+healthy/h (1109).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1109).jpg,True,1664,1632,0.5848043404373469,84.65312194824219,3d720f7897fa409a35b277d317125c01,[],True
+healthy/h (1110).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1110).jpg,True,1638,1915,0.5667336856617647,53.81716537475586,974a636e91c8e1537e2153e8f70cccb2,[],True
+healthy/h (1111).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1111).jpg,True,986,1613,0.5829746021943933,108.37887573242188,6a9099c4b56daa31daa52563358a71bf,[],True
+healthy/h (1112).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1112).jpg,True,1908,2062,0.5641481287339154,161.7349853515625,2e24a158e048a9903b1670a38b2b4a24,[],True
+healthy/h (1113).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1113).jpg,True,1628,997,0.5604756074793199,79.23094177246094,43793b34a85e0557780d208da7c91551,[],True
+healthy/h (1114).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1114).jpg,True,1528,1851,0.599996768727022,85.5168685913086,276a9e22d7132f2df7234fac39d8f866,[],True
+healthy/h (1115).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1115).jpg,True,953,1269,0.5971138748468138,52.8133430480957,ddfba753276e6680abefb29f145a19e3,[],True
+healthy/h (1116).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1116).jpg,True,2046,1492,0.6210206873276655,37.113216400146484,a7b112755b508a849e6b73cbc7a28a83,[],True
+healthy/h (1117).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1117).jpg,True,1018,1241,0.6131615732230392,68.40802764892578,fd611e6f97919723b955734b4f88fa2f,[],True
+healthy/h (1118).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1118).jpg,True,2069,1327,0.6083533791934743,98.55763244628906,e9d2224cb1d40941204b3b030e77e219,[],True
+healthy/h (1119).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1119).jpg,True,2124,1604,0.5998906752642463,59.884098052978516,563fec85c4d2bb38e286a3622eb3149e,[],True
+healthy/h (1120).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1120).jpg,True,910,932,0.610728364832261,94.43073272705078,fc4374abe35e5b93d04998da9138ec46,[],True
+healthy/h (1121).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1121).jpg,True,1973,1629,0.598655730602788,224.30673217773438,763cf8e6d894936fb1b1be5ea5529532,[],True
+healthy/h (1122).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1122).jpg,True,1159,1379,0.5880019244025735,68.37915802001953,c371d70f21ebf094c0110d57232934a2,[],True
+healthy/h (1123).jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1123).jpg,True,585,513,0.5861302394492953,161.47415161132812,a34876ddc19734a79a7d0d67b24344e4,[],True
+healthy/h (127).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (127).JPG,True,2019,2907,0.5325095980775123,42.006011962890625,c6c7f123f2e29ddd7945ef9effb4218c,[],True
+healthy/h (128).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (128).JPG,True,1822,2411,0.5404733695235907,44.86141586303711,a73d5da2db92e06efe8694b7e87f0d8b,[],True
+healthy/h (129).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (129).JPG,True,1231,905,0.45080973307291666,58.201942443847656,a7b1371a5071a5c79794bfe1a93f2330,[],True
+healthy/h (130).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (130).JPG,True,1656,3323,0.5062793208103554,28.744150161743164,e94e50324eacf060c183ca3c160f4fcf,[],True
+healthy/h (131).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (131).JPG,True,2160,3276,0.5197874181410845,28.810596466064453,dd370dd922a01b02e60c604fb098c188,[],True
+healthy/h (132).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (132).JPG,True,2079,1526,0.5135373583026961,26.9959659576416,5bf70f141bd49b84c1058d8f5fb44bdf,[],True
+healthy/h (133).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (133).JPG,True,2437,3458,0.5730539957682291,58.4073486328125,b9dc5ab3eb17f4cc90ac5b8d5b6a8008,[],True
+healthy/h (134).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (134).JPG,True,1512,1520,0.4950201894722733,31.991519927978516,acd32947d92bffbed2ff93ddb27c2e2d,[],True
+healthy/h (135).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (135).JPG,True,1472,1107,0.35974755380667894,57.2823371887207,ef84ef0aa3da0ddf27a16576aa4428e6,[],True
+healthy/h (136).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (136).JPG,True,1924,2512,0.4273999382467831,71.42695617675781,dcd79d4f466c0809bc99811665d8508a,[],True
+healthy/h (137).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (137).JPG,True,1472,986,0.3699026668772978,42.712650299072266,a2566de410cf2e0e33d5740328080819,[],True
+healthy/h (138).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (138).JPG,True,1060,1938,0.3637708177753523,53.76088333129883,973b1bcae9ccb7990f99cf9a7b375888,[],True
+healthy/h (139).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (139).JPG,True,1134,966,0.46459643794041056,53.74678039550781,dfee0d863801a8a5344a8c7ad71cf4f6,[],True
+healthy/h (140).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (140).JPG,True,871,1296,0.366037795122932,43.32733154296875,0454d1ecec9339ad6f5cd724400326ab,[],True
+healthy/h (141).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (141).JPG,True,1458,2215,0.5221169864430147,31.28891372680664,6680578db52de8f8fbe8b1b3311957cc,[],True
+healthy/h (142).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (142).JPG,True,904,1236,0.48282587387982534,43.41971206665039,d21dbedfa278b7cf2f0af147114b7489,[],True
+healthy/h (143).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (143).JPG,True,1991,2175,0.5995954924938726,99.36959075927734,9f6598d552adf0e105cba864f498902a,[],True
+healthy/h (144).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (144).JPG,True,925,878,0.4259381761737898,50.17571258544922,94389064945668829f33796f8abec380,[],True
+healthy/h (145).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (145).JPG,True,1397,871,0.47208177155139397,36.78260040283203,72bc43c1125bfa7eeaefc4d782b1bf65,[],True
+healthy/h (146).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (146).JPG,True,810,729,0.4038639143401501,69.13880157470703,50e3da258e573ca892a9e549feda77cc,[],True
+healthy/h (147).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (147).JPG,True,1438,1830,0.5412264954810049,30.607105255126953,0bf6eb0222dfac7cca39e7401917fd45,[],True
+healthy/h (148).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (148).JPG,True,1128,1393,0.5450487323835784,47.460533142089844,49851d2956a2c8c0d475d0972f5b4e61,[],True
+healthy/h (149).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (149).JPG,True,1377,1283,0.47696081423291975,60.024261474609375,fcd405a52ca0ee81df33c02eec20e1e0,[],True
+healthy/h (150).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (150).JPG,True,2038,1445,0.5672274122051164,70.47783660888672,2193dec8a5754c7ba76edf89ec7e1f20,[],True
+healthy/h (151).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (151).JPG,True,1082,1859,0.4972294526941636,53.08781814575195,d2afb9a7c9445ec04e57dc4aafabf1d5,[],True
+healthy/h (152).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (152).JPG,True,1208,1539,0.47304513968673406,42.63091278076172,216be145cdfe71ce080033c336d39047,[],True
+healthy/h (153).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (153).JPG,True,1066,1371,0.470563492120481,68.36282348632812,a78cd2c760860442adbdcac6d9e404e0,[],True
+healthy/h (154).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (154).JPG,True,997,1373,0.44465436748429843,60.73751449584961,4bf281cf8fbd14774a0be79103e4e4a7,[],True
+healthy/h (155).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (155).JPG,True,1694,2242,0.4940962548349418,58.65919876098633,f551699710a66f049ca84451262fb951,[],True
+healthy/h (156).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (156).JPG,True,992,1331,0.4734228994332108,68.24159240722656,ca5c9997e0b050bfef6aa7f5966a45c3,[],True
+healthy/h (157).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (157).JPG,True,1188,925,0.4425632252412684,60.50961685180664,dcd125575dc05e28384ebbea69cec28f,[],True
+healthy/h (158).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (158).JPG,True,1188,1722,0.4963101854511336,41.14567565917969,9d6dea6379ec8eae42d56bd708aa8d16,[],True
+healthy/h (159).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (159).JPG,True,1749,986,0.4830564611098346,25.356983184814453,0420008836231ec12e72abe2313a978d,[],True
+healthy/h (160).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (160).JPG,True,3024,3728,0.5818541882084866,38.32973098754883,a03ce82099057efc0b4ebcf7a384f6e7,[],True
+healthy/h (161).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (161).JPG,True,3024,3282,0.5827190922755822,63.594051361083984,681bc6737292ca430973871b542b771e,[],True
+healthy/h (162).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (162).JPG,True,1984,2317,0.6177738563687194,52.524169921875,6bf404c1503e131fef7d2b05474a1a19,[],True
+healthy/h (163).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (163).JPG,True,2308,4032,0.5436853745404412,33.3949089050293,4ba78974618b8799ed622bb34d178f53,[],True
+healthy/h (164).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (164).JPG,True,2494,2938,0.5077098173253677,29.668323516845703,ef5b621cb44fe454d5c6309541201f07,[],True
+healthy/h (165).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (165).JPG,True,1968,3024,0.5061962651271447,36.07698440551758,08e4743ea8a89019def47d88d274086a,[],True
+healthy/h (166).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (166).JPG,True,3024,2125,0.5246768128638174,35.76197814941406,2e47f4d0d88d8f7e27c2b3ad1340df92,[],True
+healthy/h (167).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (167).JPG,True,799,901,0.5520002776501225,133.52159118652344,5e6ec6a95e17194887112647786fe254,[],True
+healthy/h (168).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (168).JPG,True,2126,2951,0.45617723651960784,33.22504806518555,53c5767089e04b3188570e792b821f7b,[],True
+healthy/h (169).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (169).JPG,True,3024,3586,0.5552353802849265,30.924657821655273,29036a8fd7e39a2d8acda70c3057aa65,[],True
+healthy/h (170).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (170).JPG,True,1769,2850,0.4522765514897365,26.32832908630371,db8895663ec360796acf8e3d1b811a2a,[],True
+healthy/h (171).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (171).JPG,True,2052,3904,0.5326894722732843,34.24992370605469,af0a3a08536d1dce0cfdd24a1bc9a025,[],True
+healthy/h (172).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (172).JPG,True,3024,3431,0.553094721775429,30.266172409057617,d6b340f72b38cc89d91994eb6cba1576,[],True
+healthy/h (173).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (173).JPG,True,2943,2661,0.5395561667049632,44.75623321533203,a754e7439beaa4adaa022c776c8ea1dc,[],True
+healthy/h (174).JPG,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h (174).JPG,True,1661,2012,0.5353524600758272,49.71220397949219,4303b77c7b1cdb1a600a3adc2d945308,[],True
+healthy/h1.jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h1.jpg,True,474,474,0.7289825439453125,435.5823669433594,a14e123dc1133be12bf3c7491a3f680b,"[""duplicate_exact""]",False
+healthy/h10.jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h10.jpg,True,474,354,0.42918464810240503,676.8018188476562,c29234c883f525d167d696dee91498be,"[""duplicate_exact""]",False
+healthy/h11.jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h11.jpg,True,474,355,0.38865494073606005,201.90817260742188,8ad39deb427683bbaea8f69c2e1bf389,"[""duplicate_exact""]",False
+healthy/h12.jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h12.jpg,True,474,314,0.35473195992264095,933.7406616210938,e19146d9fe4d520ad65bc77833840a87,"[""duplicate_exact""]",False
+healthy/h13.jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h13.jpg,True,474,355,0.5217674105775123,1095.631591796875,a7c7c9a5cf742e96a13459f4df2825c2,"[""duplicate_exact""]",False
+healthy/h14.jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h14.jpg,True,474,355,0.40599652458639707,700.3837890625,c34762a8363009d79c3dcdc2f304602d,"[""duplicate_exact""]",False
+healthy/h15.jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h15.jpg,True,474,518,0.634710813036152,1225.445068359375,7666e28eb99eaa44c7ba923db0cf14f6,"[""duplicate_exact""]",False
+healthy/h16.jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h16.jpg,True,474,315,0.5751040589575674,574.0401000976562,a4a59b7b39be7ac8ff716372a263d238,"[""duplicate_exact""]",False
+healthy/h17.jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h17.jpg,True,474,355,0.45062674728094365,892.0938720703125,8b0ecb51bd3308173d1768a83cf2a4a3,"[""duplicate_exact""]",False
+healthy/h18.jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h18.jpg,True,474,356,0.4088482127470129,2349.150634765625,188934e600ddf30aefef00ea2ce89314,"[""duplicate_exact""]",False
+healthy/h19.jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h19.jpg,True,474,355,0.46123863669002757,1018.9177856445312,ab637c860063463a2e303195753ca755,"[""duplicate_exact""]",False
+healthy/h2.jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h2.jpg,True,474,322,0.6162997376685049,1312.308349609375,4c90699f8b20501526836183bc6447e3,"[""duplicate_exact""]",False
+healthy/h20.jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h20.jpg,True,474,237,0.5271765017041973,495.3184814453125,ef49d9b2b0e44833dcc5bcbb9ae5b669,"[""duplicate_exact""]",False
+healthy/h3.jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h3.jpg,True,474,355,0.4568709728764553,1662.829345703125,76fd7cbe95012d93840e696f9a6a9559,"[""duplicate_exact""]",False
+healthy/h4.jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h4.jpg,True,474,322,0.577700985179228,1001.3507080078125,430ee463733e578278ce889b4fc726a6,"[""duplicate_exact""]",False
+healthy/h5.jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h5.jpg,True,474,317,0.4927253274356618,725.1331176757812,c2236b0a689b0c4427e3f27545f758d3,"[""duplicate_exact""]",False
+healthy/h6.jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h6.jpg,True,474,355,0.44856797760608147,923.0413818359375,b51355ce2c9fa1d25b8e8f3304665576,"[""duplicate_exact""]",False
+healthy/h7.jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h7.jpg,True,474,355,0.5372815898820466,1856.1431884765625,475a4d6a1ae7c6c4964e1f22d890c70c,"[""duplicate_exact""]",False
+healthy/h8.jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h8.jpg,True,474,323,0.5228060254863665,1620.678466796875,7332a9c55e4ed55a9d14956e4e564cef,"[""duplicate_exact""]",False
+healthy/h9.jpg,healthy,/mnt/e/shuaib/plantation/dataset/images/healthy/h9.jpg,True,474,316,0.5824684292662378,536.0237426757812,b18223fd993de7bf1e1472461d5fc283,"[""duplicate_exact""]",False
+nutrient_deficiency/n_1.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_1.png,True,1023,1006,0.8150720932904412,58.50349426269531,637644f4a6c150e80685010fe999c581,[],True
+nutrient_deficiency/n_10.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_10.png,True,1024,1007,0.23558366064931832,161.70692443847656,84610761470cd28c3855692054d48e0d,[],True
+nutrient_deficiency/n_11.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_11.png,True,1023,1005,0.19735237570369946,113.39012145996094,282b93828d0fe7879f4974672acb6889,[],True
+nutrient_deficiency/n_12.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_12.png,True,1023,1005,0.19822987575157017,139.99539184570312,c3eeb4d3b41e919b9ac7807686e786df,[],True
+nutrient_deficiency/n_13.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_13.png,True,1023,1006,0.57438216863894,131.73098754882812,cca38ca5a2d6d25963ff155946682099,[],True
+nutrient_deficiency/n_14.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_14.png,True,1023,1006,0.6274446973613664,111.188232421875,fbc5e18cbce0f45b3bd1ad0d74836517,[],True
+nutrient_deficiency/n_15.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_15.png,True,1023,1006,0.6452809651692708,102.43933868408203,a9f78c2e71877068c9be54d82bd19244,[],True
+nutrient_deficiency/n_16.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_16.png,True,1024,1005,0.5974739224303003,116.47943115234375,c68e3d2f06ba87239576f8d000b8af73,[],True
+nutrient_deficiency/n_17.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_17.png,True,1024,1024,0.7212414311427696,161.31483459472656,08f00f6aa5b1c3556aeb7fba2f3bde8f,[],True
+nutrient_deficiency/n_18.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_18.png,True,1024,1024,0.6502680759803922,849.2045288085938,fb4fdc7bb33c4dc6b79e7af63398a79b,[],True
+nutrient_deficiency/n_19.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_19.png,True,1024,1024,0.6349756577435661,2547.100830078125,2fd2547292010eb9bc1b32cb5773f678,[],True
+nutrient_deficiency/n_2.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_2.png,True,1023,1006,0.8201397465724571,48.19301986694336,cda1b209b218f9f40073c713bf350309,[],True
+nutrient_deficiency/n_20.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_20.png,True,1024,1024,0.6365649055032169,1067.894775390625,ed5afea41f90fe2595b0832d042eb228,[],True
+nutrient_deficiency/n_21.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_21.png,True,1024,1024,0.4777327892827053,204.74205017089844,7382b2ec2570d038b868712b3739ff76,[],True
+nutrient_deficiency/n_22.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_22.png,True,1024,1024,0.4907789043351716,225.38621520996094,fb35f65fecddd19a8a42db8cb92ed32f,[],True
+nutrient_deficiency/n_23.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_23.png,True,1024,1024,0.7212414311427696,161.31483459472656,08f00f6aa5b1c3556aeb7fba2f3bde8f,"[""duplicate_exact""]",False
+nutrient_deficiency/n_24.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_24.png,True,1024,1024,0.5291865928500307,201.0854034423828,a64c8f7d950242e9a8ef7c2970048db4,[],True
+nutrient_deficiency/n_25.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_25.png,True,1024,1024,0.5141407686121323,273.6499938964844,4c0fa231710ba9e09a81da7c2898d271,[],True
+nutrient_deficiency/n_26.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_26.png,True,1023,1005,0.7527158849379596,45.00318908691406,570b92fa16b1610e07bd0a91360dcb18,[],True
+nutrient_deficiency/n_27.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_27.png,True,1023,1005,0.7506581624348958,40.86103820800781,1d84bef0081a038235321cc0f8ed6e90,[],True
+nutrient_deficiency/n_28.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_28.png,True,1020,1002,0.7336898504518995,112.4896469116211,2d37bc793fccf7c9eb5c1a1c1dc3dfa2,[],True
+nutrient_deficiency/n_29.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_29.png,True,1020,1001,0.7168500114889705,92.49120330810547,818bc9503f19b21176b5abebdea6ae86,[],True
+nutrient_deficiency/n_3.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_3.png,True,1023,1006,0.8176217471852022,60.12973403930664,44ad51ffd3d5b10e5866f1f7cf4cf5f2,[],True
+nutrient_deficiency/n_30.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_30.png,True,1024,1006,0.7307761398016238,52.06771469116211,60b28581c3065cfadb65535d03623d31,[],True
+nutrient_deficiency/n_31.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_31.png,True,1024,1007,0.6562089508655025,111.12548828125,e06f91c02a4a47827446a816442387d7,[],True
+nutrient_deficiency/n_32.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_32.png,True,1024,1003,0.7297391405292586,107.02313995361328,3a016c921cd69ae40da0ec88cdd5a8a3,[],True
+nutrient_deficiency/n_33.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_33.png,True,1023,1005,0.7173312916475184,86.56338500976562,cf734ac83cde5bb304c0f273bbc1c127,[],True
+nutrient_deficiency/n_34.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_34.png,True,1024,1002,0.7020208620557598,93.29216766357422,d1d58906bf915ac6ad76e8498678cc2b,[],True
+nutrient_deficiency/n_35.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_35.png,True,1023,1005,0.7103731043198529,60.87471389770508,8f877bb9fba6385bdab9fbec588aadde,[],True
+nutrient_deficiency/n_36.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_36.png,True,1023,1002,0.7438720104741116,80.24552917480469,1f62e28fa5d5b554201d0ecc088ca1fa,[],True
+nutrient_deficiency/n_37.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_37.png,True,1023,1005,0.5197882558785233,73.53121948242188,44e49ecc115d9cd3e5281c0d93df4f14,[],True
+nutrient_deficiency/n_38.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_38.png,True,1024,1003,0.5722938687193627,54.53605270385742,e4bfb4d80a90d561f609f532c051cd22,[],True
+nutrient_deficiency/n_39.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_39.png,True,1023,1005,0.5778130026424633,86.06898498535156,16e76f9224ce73e45f7d83a49d861c52,[],True
+nutrient_deficiency/n_4.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_4.png,True,1023,1006,0.8348738128063725,65.71818542480469,17a289eacee1ee7e9e031cd392e97cad,[],True
+nutrient_deficiency/n_40.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_40.png,True,1024,1005,0.5727466059666054,107.6529541015625,4c020ae3f403c825b66c026cf0d70ef2,[],True
+nutrient_deficiency/n_41.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_41.png,True,1023,1006,0.7227067535998775,89.15119171142578,4f511232ecdbd224ddc4080662ee647d,[],True
+nutrient_deficiency/n_42.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_42.png,True,1024,1003,0.7399038277420343,65.7315444946289,e4c2d7de3b5a32fea4105023d2ca5d80,[],True
+nutrient_deficiency/n_43.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_43.png,True,1023,1005,0.718171661975337,75.59326171875,3239c07a6f9e21dec0cb69d05c4f9759,[],True
+nutrient_deficiency/n_44.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_44.png,True,1024,1001,0.7212508257697611,59.786712646484375,7e761ed832086ea6f79f2a99561eff2e,[],True
+nutrient_deficiency/n_45.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_45.png,True,1020,999,0.7197378121170344,90.32939147949219,332bcfc445717f74622b336086dc3b56,[],True
+nutrient_deficiency/n_46.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_46.png,True,1024,1003,0.7068869796453737,57.06011199951172,1cbafd02ed787e4e899a3ed2ac30eef6,[],True
+nutrient_deficiency/n_47.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_47.png,True,1023,1006,0.6992725447112439,68.17082214355469,4aed00035620f15bd083d753b2936d06,[],True
+nutrient_deficiency/n_48.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_48.png,True,1023,1006,0.7641648236443015,50.137794494628906,9b6e780cbb3c89957f9f5355aa626ca6,[],True
+nutrient_deficiency/n_49.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_49.png,True,1023,1005,0.7215697643803615,61.50579833984375,196f2135533ff63b443107e430cfa40f,[],True
+nutrient_deficiency/n_5.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_5.png,True,1024,1003,0.820751833448223,63.922733306884766,2239e048e88594fbdf58a4c35cedd31b,[],True
+nutrient_deficiency/n_50.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_50.png,True,1020,1000,0.8216894411573223,44.931068420410156,fe91008fc2af62c549a45cb5a55d8ed0,[],True
+nutrient_deficiency/n_51.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_51.png,True,1024,1003,0.7847345090379902,79.76144409179688,de96ce6c42f6e51964a3d7b86837fa4b,[],True
+nutrient_deficiency/n_52.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_52.png,True,1024,1003,0.8139818378523285,47.23429489135742,a8bf56e88acccec7f67cbbb42376e181,[],True
+nutrient_deficiency/n_53.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_53.png,True,1024,1003,0.8067123113893995,57.59749984741211,e69911a075ceccafb0a87093c4caf1d3,[],True
+nutrient_deficiency/n_54.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_54.png,True,1023,1006,0.8222394157858456,71.08466339111328,ed6ef369ed2f2afa083caf7ca5a51fcc,[],True
+nutrient_deficiency/n_55.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_55.png,True,1024,1006,0.8045931946997549,89.88981628417969,8b3f9890f85cc7ab7d162fa25e939d0c,[],True
+nutrient_deficiency/n_56.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_56.png,True,1024,1002,0.8044726801853553,67.37957000732422,368671b297cc7226c9608f4c21958dd4,[],True
+nutrient_deficiency/n_57.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_57.png,True,1023,1006,0.8220442229626226,43.66142272949219,e29187fde3d9b0bbdf534a2e40cd5938,[],True
+nutrient_deficiency/n_58.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_58.png,True,1024,1003,0.7791955686083027,83.48789978027344,6e68b787f9a5da3a0a55847d2459dfc3,[],True
+nutrient_deficiency/n_59.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_59.png,True,1020,1002,0.7973048789828432,75.11061096191406,b8f77ceff9cd7260077f876dec990065,[],True
+nutrient_deficiency/n_7.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_7.png,True,1023,1006,0.5939089905981924,124.38622283935547,dcf706e4b34eb4b773653a52fa603508,[],True
+nutrient_deficiency/n_8.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_8.png,True,1023,1006,0.2075576333438649,220.24041748046875,2a486899c358799a4ae93850d7f09e9a,[],True
+nutrient_deficiency/n_9.png,nitrogen_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_9.png,True,1023,1005,0.19246205348594517,132.52565002441406,d33d266725eddb99411d25e91a10423f,[],True
+nutrient_deficiency/p1.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p1.png,True,1024,1024,0.5339533188763786,208.61178588867188,b36f3058c5828a192afb86619af839a1,[],True
+nutrient_deficiency/p10.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p10.png,True,1024,1024,0.5508983537262562,384.1303405761719,0ed6f7920f90689ebe80a2bd8a3621ee,[],True
+nutrient_deficiency/p11.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p11.png,True,1024,1024,0.5244919720818014,268.71966552734375,38a0f03d3300888fe7a4ff6db6e299f0,[],True
+nutrient_deficiency/p12.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p12.png,True,1024,1024,0.41768344056372547,226.39425659179688,3e897c540414b0d4ba59817e4672607b,[],True
+nutrient_deficiency/p13.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p13.png,True,1024,1024,0.4382299685010723,234.16390991210938,05a85deb6fa8bb677e3e3e46c323000d,[],True
+nutrient_deficiency/p14.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p14.png,True,1024,1024,0.3895156261967678,276.6256408691406,558c490d5023b75ee0207edcb6b58dff,[],True
+nutrient_deficiency/p15.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p15.png,True,1024,1024,0.4306079939299939,315.9405212402344,3fcaf22c701fe0b6569acbecb6224e05,[],True
+nutrient_deficiency/p16.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p16.png,True,1024,1024,0.6929382922602635,257.1683349609375,8c800d06f72ba1595f878028a862a028,[],True
+nutrient_deficiency/p17.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p17.png,True,1024,1024,0.5515565759995404,160.72402954101562,99889d64a79b1c100ae94e3abde54504,[],True
+nutrient_deficiency/p18.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p18.png,True,1024,1024,0.5159731397441789,309.0591125488281,16373497feac2fadbc102c0d415c4c07,[],True
+nutrient_deficiency/p19.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p19.png,True,1024,1024,0.45176876292509194,237.60191345214844,3d9035e3a469588a00761133f1df7370,[],True
+nutrient_deficiency/p2.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p2.png,True,1024,1024,0.5585689170687806,175.56588745117188,d5054d950c2c01cad810f796c5514ed8,[],True
+nutrient_deficiency/p20.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p20.png,True,1024,1024,0.4841402540019914,150.51907348632812,1a566f02a6d110d40da2472a11181526,[],True
+nutrient_deficiency/p21.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p21.png,True,1024,1024,0.5044094310087316,331.11749267578125,eddbff90e8fde7c2402bc81e054a83b7,[],True
+nutrient_deficiency/p22.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p22.png,True,1024,1024,0.4585052490234375,182.70712280273438,5660c818ee42a167b2d1c47590e58375,[],True
+nutrient_deficiency/p23.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p23.png,True,1024,1024,0.5993724748200061,356.43206787109375,d029cdd56aa2ad0ec6f9f2009195c6a3,[],True
+nutrient_deficiency/p24.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p24.png,True,1024,1024,0.5330066157322304,166.22702026367188,e140884e079f2c89463a0dc33e4b6c57,[],True
+nutrient_deficiency/p25.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p25.png,True,1024,1024,0.503082275390625,430.7818603515625,87a6c8bc9800cb954cb498cca9d795c3,[],True
+nutrient_deficiency/p26.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p26.png,True,1024,1024,0.5882346358953737,88.1078872680664,107e39834323837aa52112d999abe422,[],True
+nutrient_deficiency/p27.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p27.png,True,1024,1024,0.6855767941942402,378.03656005859375,f6ce29ce6c8c4dd142c70f3e7fd6f2be,[],True
+nutrient_deficiency/p28.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p28.png,True,1024,1024,0.7011321423100491,306.70355224609375,ccccc481eecc7b74980dea8e41f1c1cb,[],True
+nutrient_deficiency/p29.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p29.png,True,1024,1024,0.4290959975298713,243.94091796875,386ba4f3e280d02d89bc88de79b21ef2,[],True
+nutrient_deficiency/p3.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p3.png,True,1024,1024,0.5649122051164216,1118.3116455078125,53b9a345d87785051f0408a9f788a80d,[],True
+nutrient_deficiency/p30.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p30.png,True,1024,1024,0.3896965774835325,341.98626708984375,348a27d898433915a7c553418e5f9b04,[],True
+nutrient_deficiency/p31.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p31.png,True,1024,1024,0.44438500497855393,237.65660095214844,16cf2a0907292ea5a3cf0fb59d17dfd9,[],True
+nutrient_deficiency/p32.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p32.png,True,1024,1024,0.6597719678691789,373.201171875,fc41e4721b373716ad77d47947cb965b,[],True
+nutrient_deficiency/p33.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p33.png,True,1024,1024,0.6652198342715993,197.355224609375,9af468441e7e57f063500eed2c9365ec,[],True
+nutrient_deficiency/p34.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p34.png,True,1024,1003,0.5981681075750612,274.9940185546875,35ffe5ba878b867f2e24a8e0789a2ab2,[],True
+nutrient_deficiency/p35.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p35.png,True,1023,1005,0.5257832246668198,320.669921875,0a3c482b19d6bfe94fc772c04de4d957,[],True
+nutrient_deficiency/p36.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p36.png,True,1023,1006,0.5820597929113052,174.10386657714844,485f2a51d07cad6843f4bcadd1f53383,[],True
+nutrient_deficiency/p37.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p37.png,True,1023,1005,0.5759882309857537,296.80487060546875,b67985796288a6de7d7604e439922230,[],True
+nutrient_deficiency/p38.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p38.png,True,1020,1000,0.6168065688189338,366.2384948730469,5b33f34175bd0e04a7f9e3f77fa4c047,[],True
+nutrient_deficiency/p39.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p39.png,True,1020,1002,0.6075604008693322,369.7634582519531,270f64cf05c77095518d1e82254fb2e6,[],True
+nutrient_deficiency/p4.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p4.png,True,1024,1024,0.5186936322380514,668.1206665039062,06823b3474657620c9afa8e8f4bee5b6,[],True
+nutrient_deficiency/p40.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p40.png,True,1024,1003,0.5661521762025122,429.4415283203125,c4e5ff343a260febc07673a95b4f2990,[],True
+nutrient_deficiency/p43.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p43.png,True,1023,1006,0.32855496874042583,257.017333984375,5688c5c2511dbcfa97b4c413780cb3c6,[],True
+nutrient_deficiency/p44.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p44.png,True,1023,1006,0.31148529052734375,340.7099609375,210bfa3f3acabeebd57e34dfb23a541f,[],True
+nutrient_deficiency/p45.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p45.png,True,1023,1006,0.3531273037779565,225.3882293701172,5eee79f6bbba3cf585ab8f9b4b550141,[],True
+nutrient_deficiency/p46.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p46.png,True,1023,1006,0.3595744413488052,114.53837585449219,3d81e49363da0bb90aace147e7aecc12,[],True
+nutrient_deficiency/p47.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p47.png,True,1023,1005,0.5652605842141544,1022.8025512695312,08b00a9bef55da8fbb65d14c6be90ad2,[],True
+nutrient_deficiency/p48.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p48.png,True,1023,1008,0.5574261833639705,410.9156494140625,3e7e5d27a8b25d1ffbbfc54319fadb8f,[],True
+nutrient_deficiency/p49.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p49.png,True,1023,1005,0.5432287477979473,933.1428833007812,d4822a0d720ed30bd8c0d298c023c060,[],True
+nutrient_deficiency/p50.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p50.png,True,1023,1006,0.5540488448797488,760.6884765625,d9bdc7a77aa8e207d9a748ff189b3ddc,[],True
+nutrient_deficiency/p51.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p51.png,True,1023,1006,0.5661174699371936,727.8499145507812,95f9361f8d5ef999ffe1565949544860,[],True
+nutrient_deficiency/p52.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p52.png,True,1023,1006,0.510289151060815,508.51025390625,00267feafca9c7f8ae381d90b727a46e,[],True
+nutrient_deficiency/p53.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p53.png,True,1023,1006,0.5563112146714154,797.4381713867188,3a8dc7eb1d8ef13396408793935322fd,[],True
+nutrient_deficiency/p54.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p54.png,True,1024,1024,0.49104365928500304,355.54736328125,41e4efcf105ff8d47387173e93e965bf,[],True
+nutrient_deficiency/p55.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p55.png,True,1024,1024,0.5722684972426471,340.092529296875,3aa8514488b258a3f7f0a92478857bda,[],True
+nutrient_deficiency/p56.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p56.png,True,1024,1024,0.5017815384210325,273.4143981933594,3142af5671d76b8bdc882fd51ae56d82,[],True
+nutrient_deficiency/p57.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p57.png,True,1024,1024,0.49045422123927696,344.1722717285156,aedbd40999f4ae2419b31c7df1e2d8c6,[],True
+nutrient_deficiency/p58.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p58.png,True,1024,1024,0.505690092198989,140.625,a1710212bb75f4a14e910c9ba901375e,[],True
+nutrient_deficiency/p59.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p59.png,True,1024,1024,0.4913958979587929,130.9646759033203,ef55e7683599f23a96377a3fddca885d,[],True
+nutrient_deficiency/p60.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p60.png,True,1024,1024,0.606457639208027,226.978515625,3e33ce082769875f1e1320de3c773c4e,[],True
+nutrient_deficiency/p61.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p61.png,True,1024,1024,0.5451457304113051,138.76300048828125,de11e0b47a23a04147c74ec96292e262,[],True
+nutrient_deficiency/p62.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p62.png,True,1024,1024,0.5827676212086397,139.78659057617188,8797c707845b3c2fb635674cdb54ca2b,[],True
+nutrient_deficiency/p63.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p63.png,True,1024,1024,0.5817869298598346,127.5080337524414,e7cae8b8d0e5d3aaa3fb7fca29936564,[],True
+nutrient_deficiency/p64.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p64.png,True,1024,1024,0.5770324108647366,173.09466552734375,fd870a1e99421beccaea197b2793b9f9,[],True
+nutrient_deficiency/p65.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p65.png,True,1024,1024,0.6530407475490196,77.08956146240234,94dddb83d6854905db0b1ef4800ae161,[],True
+nutrient_deficiency/p66.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p66.png,True,1024,1024,0.672474520814185,165.9869842529297,ac8655b1c3939c719940ff66a38ae4af,[],True
+nutrient_deficiency/p67.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p67.png,True,1024,1024,0.6727481019263174,124.47669219970703,12c5981cc009bd83153977e1fe41593e,[],True
+nutrient_deficiency/p68.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p68.png,True,1024,1024,0.6483193191827512,149.3167266845703,125cbb0e179eded5e1d036f832d3c20c,[],True
+nutrient_deficiency/p9.png,phosphorus_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p9.png,True,1024,1024,0.5330692665249693,354.8995361328125,e80471a0705f42cde6ebca21b210a610,[],True
+nutrient_deficiency/k_1.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_1.png,True,1024,1001,0.47594625435623467,226.34523010253906,93c1071ebe735a44f1c227e75df86791,[],True
+nutrient_deficiency/k_10.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_10.png,True,1020,1002,0.6040913301355698,165.46510314941406,ae53eea7e9c20fd3cb629761b9f72742,[],True
+nutrient_deficiency/k_11.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_11.png,True,1024,1002,0.6257346358953738,204.2533416748047,92907c4e81a97f0558ccad9ff2740172,[],True
+nutrient_deficiency/k_12.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_12.png,True,1020,1002,0.6399378159466912,299.5894775390625,b2ddee1d8ae5511713bd3f228f0c99c6,[],True
+nutrient_deficiency/k_13.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_13.png,True,1024,1003,0.6398628384459253,132.46530151367188,40986c127af44550ae283eafcdc081e9,[],True
+nutrient_deficiency/k_14.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_14.png,True,1023,1003,0.5916414747051164,119.18551635742188,f37c79c13be4534f395270f7401b7c81,[],True
+nutrient_deficiency/k_15.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_15.png,True,1023,1006,0.800410670860141,126.79391479492188,f9ef76538b559efc50d06c233d6c2f80,[],True
+nutrient_deficiency/k_16.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_16.png,True,1015,1006,0.8325980990540748,68.49732971191406,0fa7231a08c693eb71b9706c2c94f6fe,[],True
+nutrient_deficiency/k_17.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_17.png,True,1023,1005,0.845718443627451,72.05867767333984,d682303bd9eae529db292027e26347ca,[],True
+nutrient_deficiency/k_18.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_18.png,True,1024,1003,0.8542080149931066,85.44388580322266,8f8239f898de32759bfef8ccea0885bf,[],True
+nutrient_deficiency/k_19.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_19.png,True,1024,1003,0.8445843266505821,63.47209167480469,0b054c965b0cee7eaa68e55d578c84ba,[],True
+nutrient_deficiency/k_2.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_2.png,True,1023,1005,0.5212063060087316,129.14816284179688,5cf72abcc570a0b0219225dc8fbf392c,[],True
+nutrient_deficiency/k_20.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_20.png,True,1024,1003,0.6731737922219669,113.67265319824219,55c3dd0451aa80395453d6fafd9e15e6,[],True
+nutrient_deficiency/k_21.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_21.png,True,1024,1007,0.6792080748314951,125.14218139648438,489d7c3d7213113712093c5bf2c20fa5,[],True
+nutrient_deficiency/k_22.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_22.png,True,1020,1005,0.6547706155215993,64.50572204589844,9ee4d96f7bc37c5fe99ecb129cdf6142,[],True
+nutrient_deficiency/k_23.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_23.png,True,1023,1006,0.6288626876531863,91.24197387695312,d4bde6a7aa6a27fbee34fff8d484ac93,[],True
+nutrient_deficiency/k_24.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_24.png,True,1023,1006,0.6498120476217831,53.548004150390625,6433d41916b4929a8a04c512288c0ee6,[],True
+nutrient_deficiency/k_25.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_25.png,True,1023,1006,0.652722287645527,107.37474822998047,c40bbd49ffcf82de4d25feedb8c0694b,[],True
+nutrient_deficiency/k_26.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_26.png,True,1023,1005,0.7215563007429534,81.48968505859375,648ec177ecb966f13a669290d8ce34d9,[],True
+nutrient_deficiency/k_27.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_27.png,True,1024,1007,0.6449306114047182,88.7199935913086,538fa71a065cd8ae1a987f2396371069,[],True
+nutrient_deficiency/k_28.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_28.png,True,1023,1006,0.6286689907896752,65.18885803222656,35e3a8ff53d29d078d99c1fc72c5957e,[],True
+nutrient_deficiency/k_29.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_29.png,True,1023,1006,0.5923563040939032,109.59709167480469,18599db464522acd88af8f8235646fdb,[],True
+nutrient_deficiency/k_3.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_3.png,True,1023,1005,0.519392365100337,118.69365692138672,e45f6e5c3c5a9c610526fa8fcfe2ae41,[],True
+nutrient_deficiency/k_30.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_30.png,True,1023,1005,0.5563827215456495,124.20498657226562,ef8bdd1aeb5d4d759dbe5bded5ac8a0a,[],True
+nutrient_deficiency/k_31.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_31.png,True,1024,1005,0.551893705480239,189.8941650390625,a5621e848212f12ae71e049d9d3a90a6,[],True
+nutrient_deficiency/k_32.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_32.png,True,1024,1007,0.5726332122204351,386.09344482421875,c89b58b4ad881646311b42e40e76b5cd,[],True
+nutrient_deficiency/k_33.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_33.png,True,1024,1008,0.5830009310853248,176.6915740966797,df0f39fbb1c1a83454ddcb312358a6cb,[],True
+nutrient_deficiency/k_34.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_34.png,True,1023,1005,0.5802618288526348,221.40452575683594,88832b1d58b40fc9880aab3ea48d57d9,[],True
+nutrient_deficiency/k_35.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_35.png,True,1023,1005,0.5787860945159313,151.23931884765625,80e8cf13bbe8a239920121e6bd01c33b,[],True
+nutrient_deficiency/k_36.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_36.png,True,1023,1006,0.5845150218290441,229.3302764892578,054677442586295d7b1fad2f3298dbed,[],True
+nutrient_deficiency/k_37.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_37.png,True,1024,1007,0.7287584491804534,225.23529052734375,bbd2e38239516228a4e5371efba3d17a,[],True
+nutrient_deficiency/k_38.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_38.png,True,1023,1006,0.5336222929113051,76.16783905029297,4438d6ccef78a57cccd293bba6ebef1e,[],True
+nutrient_deficiency/k_39.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_39.png,True,1023,1006,0.5226499669692095,103.8158950805664,85efc239c3d0473d2dd5532de32322e7,[],True
+nutrient_deficiency/k_4.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_4.png,True,1024,1003,0.5326703838273591,180.0243682861328,67a6b60d012bd00227a887fd27772b5b,[],True
+nutrient_deficiency/k_40.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_40.png,True,1023,1006,0.5772753547219669,60.85326385498047,b9fa15690a47677b97a6d872d36086fe,[],True
+nutrient_deficiency/k_41.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_41.png,True,1024,1007,0.5316743738511029,50.043434143066406,c303d91905fd8c37edcebec989302811,[],True
+nutrient_deficiency/k_42.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_42.png,True,1024,1003,0.566435271618413,129.0994110107422,8450f2dbe00656902c6fc94c75319a56,[],True
+nutrient_deficiency/k_43.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_43.png,True,1024,1007,0.5604119992723652,164.454345703125,880cc144c822862fa3e01553468c4f16,[],True
+nutrient_deficiency/k_44.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_44.png,True,1024,1003,0.550032013537837,132.35870361328125,98f30ba09d086673eb882c64926cd0d7,[],True
+nutrient_deficiency/k_45.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_45.png,True,1023,1006,0.768231320848652,119.51319885253906,f9aee6c1b26d8d6892ba2880475028af,[],True
+nutrient_deficiency/k_46.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_46.png,True,1023,1006,0.7413448558134191,160.86810302734375,3694f68abde6f867ad9cf8fbea109899,[],True
+nutrient_deficiency/k_47.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_47.png,True,1023,1006,0.7378899667777267,125.13572692871094,47f1aed7e48c6eff3939242897acfd45,[],True
+nutrient_deficiency/k_48.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_48.png,True,1023,1006,0.7455740535960478,114.25968933105469,d0820f9abd6770731d4bc45451b817c9,[],True
+nutrient_deficiency/k_49.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_49.png,True,1023,1005,0.6864971684474571,69.35306549072266,c15bd8434287b9ab07ebc0ad21b7ede2,[],True
+nutrient_deficiency/k_5.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_5.png,True,1020,1002,0.551837277879902,148.10855102539062,2786f6795129141d5c19fc4f0c267b20,[],True
+nutrient_deficiency/k_50.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_50.png,True,1023,1006,0.7822764078776042,166.13450622558594,e6f12f20a81d1620e95871e5df6b3195,[],True
+nutrient_deficiency/k_51.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_51.png,True,1024,1003,0.7815831203086704,97.43025970458984,8192474eb7fdbc63bcdbea19f5b3e6f5,[],True
+nutrient_deficiency/k_52.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_52.png,True,1023,1006,0.8266379562078737,76.37541198730469,6b5964c6d41ef972e86be7f5959a07f0,[],True
+nutrient_deficiency/k_53.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_53.png,True,1024,1005,0.8111721263212316,47.62523651123047,ec225ab22e0f3319249b1d9225ba81e5,[],True
+nutrient_deficiency/k_54.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_54.png,True,1024,1005,0.7721320657169117,85.30992889404297,275cb6735c1e5f0473b1b5d184489c08,[],True
+nutrient_deficiency/k_55.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_55.png,True,1024,1024,0.6125971775428921,204.53257751464844,2f04934d09f5fa5eb2e799ddc21fde88,[],True
+nutrient_deficiency/k_56.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_56.png,True,1024,1024,0.5685767080269608,487.773193359375,d36076ed344a87dbe36fcb447829c4f8,[],True
+nutrient_deficiency/k_57.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_57.png,True,1024,1024,0.527320951573989,301.3458251953125,a7d2ba1f55cfd5a81f071491a353e493,[],True
+nutrient_deficiency/k_58.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_58.png,True,1024,1024,0.711767697801777,252.64747619628906,0651248a9184cf73b800e1279a3ed6c4,[],True
+nutrient_deficiency/k_59.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_59.png,True,1024,1024,0.5420192344515932,176.7686309814453,396a9ee45e038c84766fe92179fec522,[],True
+nutrient_deficiency/k_6.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_6.png,True,1023,1006,0.5775955499387255,111.56121063232422,88c4657ab073947e7013aa4b3ffac6c1,[],True
+nutrient_deficiency/k_60.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_60.png,True,1024,1024,0.5493901271446079,362.0482177734375,ffba60d73c278ff9a9921c6930e5b468,[],True
+nutrient_deficiency/k_61.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_61.png,True,1024,1024,0.476084929821538,233.28652954101562,b04ea1da63f8daa2408eda2ec3cb5822,[],True
+nutrient_deficiency/k_62.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_62.png,True,1024,1024,0.4962662939931832,185.29957580566406,a247862a0afefa72a580c5908166e1b8,[],True
+nutrient_deficiency/k_63.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_63.png,True,1024,1024,0.5284946815640319,453.437255859375,9b33d23b865977c485d8b7b0dbc66721,[],True
+nutrient_deficiency/k_64.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_64.png,True,1024,1024,0.5969112022250307,386.6023864746094,488d752fbda327b0f78c9575845220cf,[],True
+nutrient_deficiency/k_65.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_65.png,True,1024,1024,0.5572574989468444,133.0921173095703,3de181e718a4937ea48125364d0445ca,[],True
+nutrient_deficiency/k_66.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_66.png,True,1024,1024,0.5284946815640319,453.437255859375,9b33d23b865977c485d8b7b0dbc66721,"[""duplicate_exact""]",False
+nutrient_deficiency/k_67.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_67.png,True,1024,1024,0.5436493518305759,169.63323974609375,82bfa6ab4ac332fbf753ded23ec3c755,[],True
+nutrient_deficiency/k_68.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_68.png,True,1024,1024,0.711767697801777,252.64747619628906,0651248a9184cf73b800e1279a3ed6c4,"[""duplicate_exact""]",False
+nutrient_deficiency/k_69.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_69.png,True,1024,1024,0.527320951573989,301.3458251953125,a7d2ba1f55cfd5a81f071491a353e493,"[""duplicate_exact""]",False
+nutrient_deficiency/k_7.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_7.png,True,1024,1003,0.6160083247166054,292.6759948730469,9de1ad8fd22723ce7d326e592fc21727,[],True
+nutrient_deficiency/k_70.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_70.png,True,1024,1024,0.5685767080269608,487.773193359375,d36076ed344a87dbe36fcb447829c4f8,"[""duplicate_exact""]",False
+nutrient_deficiency/k_71.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_71.png,True,1024,1024,0.5583226821001839,170.36407470703125,1e45b4b045feb12e0aa4c34592bec22e,[],True
+nutrient_deficiency/k_72.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_72.png,True,1024,1024,0.48108188404756436,198.2615509033203,46edf4f1afa690863633b355208dab71,[],True
+nutrient_deficiency/k_8.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_8.png,True,1023,1005,0.6624579336128983,181.0823516845703,c83694495a8b84b3769fee27c592193f,[],True
+nutrient_deficiency/k_9.png,potassium_deficiency,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/k_9.png,True,1020,1001,0.6225969501570159,132.29576110839844,83dae5d406470da43b927914abec7ff5,[],True

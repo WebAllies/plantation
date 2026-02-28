@@ -1,0 +1,5 @@
+healthy
+nitrogen_deficiency
+phosphorus_deficiency
+potassium_deficiency
+fungal_mildew

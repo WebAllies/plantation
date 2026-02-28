@@ -1,0 +1,73 @@
+image_path,label,captureSessionId,resolved_path,label_idx
+fungal_mildew/p07.jpg,fungal_mildew,fungal_mildew_s004,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p07.jpg,4
+fungal_mildew/p08.jpg,fungal_mildew,fungal_mildew_s004,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p08.jpg,4
+fungal_mildew/p09.jpg,fungal_mildew,fungal_mildew_s004,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p09.jpg,4
+fungal_mildew/p10.jpg,fungal_mildew,fungal_mildew_s004,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p10.jpg,4
+fungal_mildew/p11.jpg,fungal_mildew,fungal_mildew_s004,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p11.jpg,4
+fungal_mildew/p12.jpg,fungal_mildew,fungal_mildew_s004,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p12.jpg,4
+fungal_mildew/p13.jpg,fungal_mildew,fungal_mildew_s004,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p13.jpg,4
+fungal_mildew/p14.jpg,fungal_mildew,fungal_mildew_s004,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p14.jpg,4
+fungal_mildew/p15.jpg,fungal_mildew,fungal_mildew_s004,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p15.jpg,4
+fungal_mildew/p16.jpg,fungal_mildew,fungal_mildew_s004,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p16.jpg,4
+fungal_mildew/p17.jpg,fungal_mildew,fungal_mildew_s004,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p17.jpg,4
+fungal_mildew/p18.jpg,fungal_mildew,fungal_mildew_s004,/mnt/e/shuaib/plantation/dataset/images/fungal_mildew/p18.jpg,4
+healthy/h (102).JPG,healthy,healthy_s003,/mnt/e/shuaib/plantation/dataset/images/healthy/h (102).JPG,0
+healthy/h (1020).JPG,healthy,healthy_s003,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1020).JPG,0
+healthy/h (1021).JPG,healthy,healthy_s003,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1021).JPG,0
+healthy/h (1022).JPG,healthy,healthy_s003,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1022).JPG,0
+healthy/h (1023).JPG,healthy,healthy_s003,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1023).JPG,0
+healthy/h (1024).JPG,healthy,healthy_s003,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1024).JPG,0
+healthy/h (1025).JPG,healthy,healthy_s003,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1025).JPG,0
+healthy/h (1026).JPG,healthy,healthy_s003,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1026).JPG,0
+healthy/h (103).JPG,healthy,healthy_s003,/mnt/e/shuaib/plantation/dataset/images/healthy/h (103).JPG,0
+healthy/h (1032).JPG,healthy,healthy_s003,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1032).JPG,0
+healthy/h (1033).JPG,healthy,healthy_s003,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1033).JPG,0
+healthy/h (1034).JPG,healthy,healthy_s003,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1034).JPG,0
+healthy/h (1068).JPG,healthy,healthy_s007,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1068).JPG,0
+healthy/h (1069).JPG,healthy,healthy_s007,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1069).JPG,0
+healthy/h (107).JPG,healthy,healthy_s007,/mnt/e/shuaib/plantation/dataset/images/healthy/h (107).JPG,0
+healthy/h (1070).JPG,healthy,healthy_s007,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1070).JPG,0
+healthy/h (1071).JPG,healthy,healthy_s007,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1071).JPG,0
+healthy/h (1072).jpg,healthy,healthy_s007,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1072).jpg,0
+healthy/h (1073).jpg,healthy,healthy_s007,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1073).jpg,0
+healthy/h (1074).jpg,healthy,healthy_s007,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1074).jpg,0
+healthy/h (1075).jpg,healthy,healthy_s007,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1075).jpg,0
+healthy/h (1076).jpg,healthy,healthy_s007,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1076).jpg,0
+healthy/h (1077).jpg,healthy,healthy_s007,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1077).jpg,0
+healthy/h (1078).jpg,healthy,healthy_s007,/mnt/e/shuaib/plantation/dataset/images/healthy/h (1078).jpg,0
+nutrient_deficiency/n_42.png,nitrogen_deficiency,nitrogen_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_42.png,1
+nutrient_deficiency/n_43.png,nitrogen_deficiency,nitrogen_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_43.png,1
+nutrient_deficiency/n_44.png,nitrogen_deficiency,nitrogen_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_44.png,1
+nutrient_deficiency/n_45.png,nitrogen_deficiency,nitrogen_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_45.png,1
+nutrient_deficiency/n_46.png,nitrogen_deficiency,nitrogen_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_46.png,1
+nutrient_deficiency/n_47.png,nitrogen_deficiency,nitrogen_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_47.png,1
+nutrient_deficiency/n_48.png,nitrogen_deficiency,nitrogen_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_48.png,1
+nutrient_deficiency/n_49.png,nitrogen_deficiency,nitrogen_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_49.png,1
+nutrient_deficiency/n_5.png,nitrogen_deficiency,nitrogen_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_5.png,1
+nutrient_deficiency/n_50.png,nitrogen_deficiency,nitrogen_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_50.png,1
+nutrient_deficiency/n_51.png,nitrogen_deficiency,nitrogen_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_51.png,1
+nutrient_deficiency/n_52.png,nitrogen_deficiency,nitrogen_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/n_52.png,1
+nutrient_deficiency/p20.png,phosphorus_deficiency,phosphorus_deficiency_s002,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p20.png,2
+nutrient_deficiency/p21.png,phosphorus_deficiency,phosphorus_deficiency_s002,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p21.png,2
+nutrient_deficiency/p22.png,phosphorus_deficiency,phosphorus_deficiency_s002,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p22.png,2
+nutrient_deficiency/p23.png,phosphorus_deficiency,phosphorus_deficiency_s002,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p23.png,2
+nutrient_deficiency/p24.png,phosphorus_deficiency,phosphorus_deficiency_s002,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p24.png,2
+nutrient_deficiency/p25.png,phosphorus_deficiency,phosphorus_deficiency_s002,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p25.png,2
+nutrient_deficiency/p26.png,phosphorus_deficiency,phosphorus_deficiency_s002,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p26.png,2
+nutrient_deficiency/p27.png,phosphorus_deficiency,phosphorus_deficiency_s002,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p27.png,2
+nutrient_deficiency/p28.png,phosphorus_deficiency,phosphorus_deficiency_s002,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p28.png,2
+nutrient_deficiency/p29.png,phosphorus_deficiency,phosphorus_deficiency_s002,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p29.png,2
+nutrient_deficiency/p3.png,phosphorus_deficiency,phosphorus_deficiency_s002,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p3.png,2
+nutrient_deficiency/p30.png,phosphorus_deficiency,phosphorus_deficiency_s002,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p30.png,2
+nutrient_deficiency/p44.png,phosphorus_deficiency,phosphorus_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p44.png,2
+nutrient_deficiency/p45.png,phosphorus_deficiency,phosphorus_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p45.png,2
+nutrient_deficiency/p46.png,phosphorus_deficiency,phosphorus_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p46.png,2
+nutrient_deficiency/p47.png,phosphorus_deficiency,phosphorus_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p47.png,2
+nutrient_deficiency/p48.png,phosphorus_deficiency,phosphorus_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p48.png,2
+nutrient_deficiency/p49.png,phosphorus_deficiency,phosphorus_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p49.png,2
+nutrient_deficiency/p50.png,phosphorus_deficiency,phosphorus_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p50.png,2
+nutrient_deficiency/p51.png,phosphorus_deficiency,phosphorus_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p51.png,2
+nutrient_deficiency/p52.png,phosphorus_deficiency,phosphorus_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p52.png,2
+nutrient_deficiency/p53.png,phosphorus_deficiency,phosphorus_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p53.png,2
+nutrient_deficiency/p54.png,phosphorus_deficiency,phosphorus_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p54.png,2
+nutrient_deficiency/p55.png,phosphorus_deficiency,phosphorus_deficiency_s004,/mnt/e/shuaib/plantation/dataset/images/nutrient_deficiency/p55.png,2

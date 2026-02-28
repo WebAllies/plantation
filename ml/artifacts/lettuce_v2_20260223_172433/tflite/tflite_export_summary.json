@@ -1,0 +1,18 @@
+{
+  "float16_model": "/mnt/e/shuaib/plantation/ml/artifacts/lettuce_v2_20260223_172433/tflite/lettuce_model_float16.tflite",
+  "int8_model": "/mnt/e/shuaib/plantation/ml/artifacts/lettuce_v2_20260223_172433/tflite/lettuce_model_int8.tflite",
+  "selected_variant": "float16",
+  "selected_model": "/mnt/e/shuaib/plantation/ml/artifacts/lettuce_v2_20260223_172433/tflite/lettuce_model_float16.tflite",
+  "float16_metrics": {
+    "macro_f1": 0.8816518218623483,
+    "mean_latency_ms": 14.638516549791643,
+    "num_samples": 71
+  },
+  "int8_metrics": {
+    "macro_f1": 0.8206565745467348,
+    "mean_latency_ms": 14.125681382236662,
+    "num_samples": 71
+  },
+  "latency_budget_ms": 250.0,
+  "max_macro_f1_drop": 0.015
+}

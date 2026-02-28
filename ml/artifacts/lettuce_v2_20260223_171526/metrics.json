@@ -1,0 +1,183 @@
+{
+  "run_name": "lettuce_v2_20260223_171526",
+  "model_path": "/mnt/e/shuaib/plantation/ml/artifacts/lettuce_v2_20260223_171526/model_final.keras",
+  "class_names": [
+    "healthy",
+    "nitrogen_deficiency",
+    "phosphorus_deficiency",
+    "potassium_deficiency",
+    "fungal_mildew"
+  ],
+  "val": {
+    "macro_f1": 0.13626373626373628,
+    "binary_f1": 0.34065934065934067,
+    "classification_report": {
+      "healthy": {
+        "precision": 0.5166666666666667,
+        "recall": 1.0,
+        "f1-score": 0.6813186813186813,
+        "support": 31.0
+      },
+      "nitrogen_deficiency": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 12.0
+      },
+      "phosphorus_deficiency": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 2.0
+      },
+      "potassium_deficiency": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 12.0
+      },
+      "fungal_mildew": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 3.0
+      },
+      "accuracy": 0.5166666666666667,
+      "macro avg": {
+        "precision": 0.10333333333333335,
+        "recall": 0.2,
+        "f1-score": 0.13626373626373628,
+        "support": 60.0
+      },
+      "weighted avg": {
+        "precision": 0.2669444444444445,
+        "recall": 0.5166666666666667,
+        "f1-score": 0.352014652014652,
+        "support": 60.0
+      }
+    },
+    "confusion_matrix": [
+      [
+        31,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        12,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        2,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        12,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        3,
+        0,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "test": {
+    "macro_f1": 0.10105263157894737,
+    "binary_f1": 0.25263157894736843,
+    "classification_report": {
+      "healthy": {
+        "precision": 0.3380281690140845,
+        "recall": 1.0,
+        "f1-score": 0.5052631578947369,
+        "support": 24.0
+      },
+      "nitrogen_deficiency": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 11.0
+      },
+      "phosphorus_deficiency": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 12.0
+      },
+      "potassium_deficiency": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 12.0
+      },
+      "fungal_mildew": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 12.0
+      },
+      "accuracy": 0.3380281690140845,
+      "macro avg": {
+        "precision": 0.0676056338028169,
+        "recall": 0.2,
+        "f1-score": 0.10105263157894737,
+        "support": 71.0
+      },
+      "weighted avg": {
+        "precision": 0.11426304304701448,
+        "recall": 0.3380281690140845,
+        "f1-score": 0.17079318013343217,
+        "support": 71.0
+      }
+    },
+    "confusion_matrix": [
+      [
+        24,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        11,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        12,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        12,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        12,
+        0,
+        0,
+        0,
+        0
+      ]
+    ]
+  }
+}
