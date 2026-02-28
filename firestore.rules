@@ -86,6 +86,11 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create, update, delete: if isDeviceAccount() || isAdminOrSuperAdmin();
 
+      match /weather/{docId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+
       match /commands/{commandId} {
         allow read: if isSignedIn();
         allow create: if isAdminOrSuperAdmin();

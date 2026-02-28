@@ -3,6 +3,7 @@ import 'package:iot_aqua_app/core/device/device_selector_header.dart';
 import 'package:iot_aqua_app/ai/my_scan_history_page.dart';
 
 import 'ai_scan_page.dart';
+import 'ai_weather_page.dart';
 
 class AiInsightPage extends StatelessWidget {
   const AiInsightPage({super.key});
@@ -11,7 +12,7 @@ class AiInsightPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("AI Insight 🧠"),
+        title: const Text("AI Insight "),
         bottom: const DeviceSelectorHeaderBottom(),
       ),
       body: Padding(
@@ -32,7 +33,22 @@ class AiInsightPage extends StatelessWidget {
                 },
               ),
             ),
+            const SizedBox(height: 12),
 
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.cloud),
+                title: const Text("Weather AI (Forecast Automation)"),
+                subtitle: const Text("Rain → reduce irrigation • Heat → increase circulation"),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AiWeatherPage()),
+                  );
+                },
+              ),
+            ),
             const SizedBox(height: 12),
 
             Card(

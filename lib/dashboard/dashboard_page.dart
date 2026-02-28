@@ -302,6 +302,62 @@ class _DashboardPageState extends State<DashboardPage> {
         return '--';
     }
   }
+      Widget _weatherDashboardCard(String deviceId) {
+      final docRef = FirebaseFirestore.instance
+          .collection('devices')
+          .doc(deviceId)
+          .collection('weather')
+          .doc('latest');
+
+      return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: docRef.snapshots(),
+        builder: (context, snap) {
+          if (!snap.hasData || snap.data?.data() == null) {
+            return const Card(
+              child: ListTile(
+                leading: Icon(Icons.cloud_outlined),
+                title: Text('Weather Forecast'),
+                subtitle: Text('No weather data yet. Open Weather AI and refresh.'),
+              ),
+            );
+          }
+
+          final d = snap.data!.data()!;
+
+          DateTime? updatedAt;
+          final raw = d['updatedAt'];
+          if (raw is Timestamp) updatedAt = raw.toDate();
+
+          final location = (d['locationName'] ?? 'Unknown').toString();
+          final maxTemp = (d['maxTempC'] as num?)?.toDouble() ?? 0;
+          final rainChance = (d['chanceOfRain'] as num?)?.toDouble() ?? 0;
+          final precip = (d['totalPrecipMm'] as num?)?.toDouble() ?? 0;
+
+          final updatedText = updatedAt == null
+              ? '—'
+              : DateFormat('dd MMM, HH:mm').format(updatedAt);
+
+          IconData icon = Icons.cloud_outlined;
+          if (rainChance >= 60 || precip >= 5) {
+            icon = Icons.umbrella;
+          } else if (maxTemp >= 30) {
+            icon = Icons.wb_sunny;
+          }
+
+          return Card(
+            child: ListTile(
+              leading: Icon(icon),
+              title: const Text('Weather Forecast (Next 24h)'),
+              subtitle: Text(
+                '$location • Updated: $updatedText\n'
+                'Max: ${maxTemp.toStringAsFixed(1)}°C  •  Rain: ${rainChance.toStringAsFixed(0)}%  •  Precip: ${precip.toStringAsFixed(1)}mm',
+              ),
+              isThreeLine: true,
+            ),
+          );
+        },
+      );
+    }
 
   Widget _activeAlertCard(_TelemetryFrame frame) {
     final source = (_alertStateData?['effectiveSource'] ?? 'global')
@@ -806,6 +862,10 @@ class _DashboardPageState extends State<DashboardPage> {
                   isThreeLine: true,
                 ),
               ),
+              
+              const SizedBox(height: 12),
+              _weatherDashboardCard(deviceId),
+
               if (_activeAlertMetrics.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 _activeAlertCard(activeFrame),
