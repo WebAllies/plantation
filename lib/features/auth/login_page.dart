@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/services/auth_service.dart';
-import '../shell/main_shell.dart';
+import 'app_auth_root.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -28,9 +28,10 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _goHome() {
-    Navigator.pushReplacement(
+    Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const MainShell()),
+      MaterialPageRoute(builder: (_) => const AppAuthRoot()),
+      (route) => false,
     );
   }
 
@@ -117,11 +118,14 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   child: Column(
                     children: const [
-                      Icon(Icons.eco, size: 56,color: Color(0xFF2E7D32)),
+                      Icon(Icons.eco, size: 56, color: Color(0xFF2E7D32)),
                       SizedBox(height: 10),
                       Text(
                         "Smart IoT Aquaponics",
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                       SizedBox(height: 6),
                       Text(
@@ -173,14 +177,21 @@ class _LoginPageState extends State<LoginPage> {
                             border: const OutlineInputBorder(),
                             prefixIcon: const Icon(Icons.lock),
                             suffixIcon: IconButton(
-                              onPressed: () => setState(() => _hidePass = !_hidePass),
-                              icon: Icon(_hidePass ? Icons.visibility : Icons.visibility_off),
+                              onPressed: () =>
+                                  setState(() => _hidePass = !_hidePass),
+                              icon: Icon(
+                                _hidePass
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                              ),
                             ),
                           ),
                           validator: (v) {
                             final value = (v ?? "").trim();
                             if (value.isEmpty) return "Password is required";
-                            if (value.length < 6) return "Password must be at least 6 characters";
+                            if (value.length < 6) {
+                              return "Password must be at least 6 characters";
+                            }
                             return null;
                           },
                         ),
@@ -195,7 +206,10 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.error_outline, color: Colors.red),
+                                const Icon(
+                                  Icons.error_outline,
+                                  color: Colors.red,
+                                ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
@@ -219,7 +233,9 @@ class _LoginPageState extends State<LoginPage> {
                                 ? const SizedBox(
                                     height: 18,
                                     width: 18,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
                                   )
                                 : const Text("Login"),
                           ),
@@ -242,7 +258,10 @@ class _LoginPageState extends State<LoginPage> {
                         const Text(
                           "Note: Employees are created by Admin.\nIf you don’t have credentials, contact your admin.",
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: Color(0xFF2E7D32), fontSize: 12),
+                          style: TextStyle(
+                            color: Color(0xFF2E7D32),
+                            fontSize: 12,
+                          ),
                         ),
                       ],
                     ),
@@ -255,7 +274,10 @@ class _LoginPageState extends State<LoginPage> {
                 Text(
                   "Super Admin: ${AuthService.superAdminEmail}",
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Color(0xFF2E7D32), fontSize: 12),
+                  style: const TextStyle(
+                    color: Color(0xFF2E7D32),
+                    fontSize: 12,
+                  ),
                 ),
 
                 const SizedBox(height: 12),

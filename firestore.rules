@@ -1,0 +1,132 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isDeviceAccount() {
+      return isSignedIn()
+             && (
+               request.auth.token.email == "device@iot.com"
+               || request.auth.uid == "o1vjb9RhhlOf95xrAOSlbobVMik2"
+             );
+    }
+
+    function userRole() {
+      return isSignedIn()
+             && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+             ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+             : null;
+    }
+
+    function hasAdminRole() {
+      return userRole() is string
+             && userRole().matches("(?i)^ *(admin|super[_ ]?admin) *$");
+    }
+
+    function isAdminOrSuperAdmin() {
+      return hasAdminRole();
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isAiScanVerificationPatch() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        "verificationStatus",
+        "verifiedLabel",
+        "verifiedBy",
+        "verifiedAt"
+      ]);
+    }
+
+    match /users/{uid} {
+      // App lock metadata lives in users/{uid}.security.appLock.
+      // Admin/Super Admin updates are allowed so they can trigger PIN reset flows:
+      // security.appLock.pinVersion / resetAt / resetByUid / resetByRole.
+      allow read: if isOwner(uid) || isAdminOrSuperAdmin();
+      allow create: if isOwner(uid) || isAdminOrSuperAdmin();
+      allow update: if isAdminOrSuperAdmin()
+                    || (isOwner(uid)
+                        && request.resource.data.role == resource.data.role);
+      allow delete: if isAdminOrSuperAdmin();
+    }
+
+    match /ai_scans/{scanId} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn()
+                  && (resource.data.userId == request.auth.uid
+                      || isAdminOrSuperAdmin());
+      allow update: if isAdminOrSuperAdmin() && isAiScanVerificationPatch();
+      allow delete: if false;
+    }
+
+    match /settings/{docId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdminOrSuperAdmin();
+    }
+
+    // System config/status docs used by System tab:
+    // system/settings, system/status, system/ai, etc.
+    match /system/{docId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdminOrSuperAdmin();
+
+      // Future-proof any nested docs under system/{docId}/...
+      match /{subPath=**} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isAdminOrSuperAdmin();
+      }
+    }
+
+    match /devices/{deviceId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isDeviceAccount() || isAdminOrSuperAdmin();
+
+      match /weather/{docId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+
+      match /commands/{commandId} {
+        allow read: if isSignedIn();
+        allow create: if isAdminOrSuperAdmin();
+        allow update: if isDeviceAccount() || isAdminOrSuperAdmin();
+        allow delete: if isAdminOrSuperAdmin();
+      }
+
+      match /logs/{logId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isDeviceAccount() || isAdminOrSuperAdmin();
+      }
+
+      match /readings/{readingId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isDeviceAccount() || isAdminOrSuperAdmin();
+      }
+
+      match /configs/{configId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isAdminOrSuperAdmin();
+      }
+
+      match /alerts/{alertId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if false;
+      }
+
+      match /alert_state/{docId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if false;
+      }
+
+      match /automation/{docId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if false;
+      }
+    }
+  }
+}

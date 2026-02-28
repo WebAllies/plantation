@@ -1,0 +1,60 @@
+seed: 42
+
+data:
+  metadata_csv: dataset/metadata.cleaned.csv
+  image_root: dataset/images
+  image_column: image_path
+  label_column: label
+  group_column: captureSessionId
+  validate_images: true
+  split_strategy: per_label_grouped
+  allowed_labels:
+    - healthy
+    - nitrogen_deficiency
+    - phosphorus_deficiency
+    - potassium_deficiency
+    - fungal_mildew
+  split:
+    train: 0.70
+    val: 0.15
+    test: 0.15
+
+training:
+  input_size: 224
+  batch_size: 32
+  stage_a_epochs: 12
+  stage_b_epochs: 15
+  stage_b_unfreeze_layers: 40
+  stage_a_lr: 0.0003
+  stage_b_lr: 0.00003
+  dropout: 0.30
+  label_smoothing: 0.02
+  early_stopping_patience: 6
+  reduce_lr_patience: 3
+  reduce_lr_factor: 0.5
+  reduce_lr_min_lr: 0.000001
+  oversample_train: true
+  oversample_target: p75
+  oversample_max_multiplier: 3.0
+  augmentation:
+    flip_horizontal: true
+    flip_vertical: false
+    rotation: 0.04
+    zoom: 0.12
+    brightness: 0.10
+    contrast: 0.10
+    blur_probability: 0.05
+
+output:
+  root_dir: ml/artifacts
+  run_name_prefix: lettuce_v2
+
+model:
+  normalization: "[0,255]"
+
+binary_mapping:
+  healthy: Healthy
+  nitrogen_deficiency: Unhealthy
+  phosphorus_deficiency: Unhealthy
+  potassium_deficiency: Unhealthy
+  fungal_mildew: Unhealthy

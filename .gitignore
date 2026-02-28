@@ -2,6 +2,7 @@
 *.class
 *.log
 *.pyc
+__pycache__/
 *.swp
 .DS_Store
 .atom/
@@ -43,3 +44,16 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Firebase Functions
+functions/node_modules/
+functions/.env
+functions/.env.*
+
+# ML workspace artifacts
+ml/.venv/
+ml/artifacts/
+ml/exports/
+ml/.cache/
+dataset/
+ml/dataset/
