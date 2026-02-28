@@ -1,18 +1,28 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../core/config/device_config.dart';
-
-const String kDeviceId = "esp32_01";
 
 class LogsPage extends StatelessWidget {
-  const LogsPage({super.key});
+  const LogsPage({super.key, required this.selectedDeviceId});
+
+  final String? selectedDeviceId;
 
   @override
   Widget build(BuildContext context) {
+    if (selectedDeviceId == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text("Logs / History")),
+        body: const Center(
+          child: Text(
+            "No devices found. Flash an ESP32 with a unique DEVICE_ID and connect it.",
+          ),
+        ),
+      );
+    }
+
     final q = FirebaseFirestore.instance
         .collection('devices')
-        .doc(kDeviceId)
+        .doc(selectedDeviceId)
         .collection('logs')
         .orderBy('ts', descending: true)
         .limit(200);
@@ -22,7 +32,9 @@ class LogsPage extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot>(
         stream: q.snapshots(),
         builder: (context, snap) {
-          if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+          if (!snap.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
           final docs = snap.data!.docs;
           if (docs.isEmpty) return const Center(child: Text("No logs yet."));
 
@@ -49,7 +61,9 @@ class LogsPage extends StatelessWidget {
                 child: ListTile(
                   leading: Icon(icon),
                   title: Text(event),
-                  subtitle: Text("${dt == null ? '—' : fmt.format(dt)}\n$detail"),
+                  subtitle: Text(
+                    "${dt == null ? '—' : fmt.format(dt)}\n$detail",
+                  ),
                   isThreeLine: true,
                 ),
               );

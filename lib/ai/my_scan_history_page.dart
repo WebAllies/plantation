@@ -11,15 +11,15 @@ class MyScanHistoryPage extends StatelessWidget {
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
-      return const Scaffold(body: Center(child: Text("Not logged in")));
+      return const Scaffold(body: Center(child: Text('Not logged in')));
     }
 
     final q = FirebaseFirestore.instance
         .collection('ai_scans')
-        .where('userId', isEqualTo: user.uid); // ✅ no orderBy (avoids index)
+        .where('userId', isEqualTo: user.uid);
 
     return Scaffold(
-      appBar: AppBar(title: const Text("My Scan History")),
+      appBar: AppBar(title: const Text('My Scan History')),
       body: StreamBuilder<QuerySnapshot>(
         stream: q.snapshots(),
         builder: (context, snap) {
@@ -27,24 +27,28 @@ class MyScanHistoryPage extends StatelessWidget {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Text("Error loading history:\n${snap.error}"),
+                child: Text('Error loading history:\n${snap.error}'),
               ),
             );
           }
-          if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-
-          final docs = snap.data!.docs;
-
-          if (docs.isEmpty) {
-            return const Center(child: Text("No scans yet."));
+          if (!snap.hasData) {
+            return const Center(child: CircularProgressIndicator());
           }
 
-          // ✅ sort locally by createdAt desc (null-safe)
+          final docs = snap.data!.docs;
+          if (docs.isEmpty) {
+            return const Center(child: Text('No scans yet.'));
+          }
+
           docs.sort((a, b) {
             final ad = (a.data() as Map<String, dynamic>)['createdAt'];
             final bd = (b.data() as Map<String, dynamic>)['createdAt'];
-            final at = ad is Timestamp ? ad.toDate() : DateTime.fromMillisecondsSinceEpoch(0);
-            final bt = bd is Timestamp ? bd.toDate() : DateTime.fromMillisecondsSinceEpoch(0);
+            final at = ad is Timestamp
+                ? ad.toDate()
+                : DateTime.fromMillisecondsSinceEpoch(0);
+            final bt = bd is Timestamp
+                ? bd.toDate()
+                : DateTime.fromMillisecondsSinceEpoch(0);
             return bt.compareTo(at);
           });
 
@@ -56,8 +60,14 @@ class MyScanHistoryPage extends StatelessWidget {
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (context, i) {
               final d = docs[i].data() as Map<String, dynamic>;
-              final label = (d['label'] ?? '').toString();
+              final predictedClass = (d['predictedClass'] ?? d['label'] ?? '')
+                  .toString();
+              final predictedBinary = (d['predictedBinary'] ?? d['label'] ?? '')
+                  .toString();
               final conf = (d['confidence'] ?? 0.0) as num;
+              final verificationStatus = (d['verificationStatus'] ?? 'pending')
+                  .toString();
+              final modelVersion = (d['modelVersion'] ?? '').toString();
 
               final ts = d['createdAt'];
               final dt = ts is Timestamp ? ts.toDate() : null;
@@ -65,10 +75,14 @@ class MyScanHistoryPage extends StatelessWidget {
               return Card(
                 child: ListTile(
                   leading: const Icon(Icons.psychology),
-                  title: Text(label),
+                  title: Text('$predictedClass ($predictedBinary)'),
                   subtitle: Text(
-                    "Confidence: ${(conf * 100).toStringAsFixed(1)}%  •  ${dt == null ? '—' : dtf.format(dt)}",
+                    'Confidence: ${(conf * 100).toStringAsFixed(1)}%  •  '
+                    'Status: $verificationStatus\n'
+                    '${dt == null ? '—' : dtf.format(dt)}'
+                    '${modelVersion.isEmpty ? '' : '  •  $modelVersion'}',
                   ),
+                  isThreeLine: true,
                 ),
               );
             },

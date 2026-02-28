@@ -2,12 +2,19 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:iot_aqua_app/core/security/app_lock_service.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  static final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+  static Future<void>? _googleSignInInitFuture;
 
   static const String superAdminEmail = "superadmin@iot.com";
+
+  Future<void> _ensureGoogleSignInInitialized() {
+    return _googleSignInInitFuture ??= _googleSignIn.initialize();
+  }
 
   Future<UserCredential> signInEmail(String email, String password) async {
     final cred = await _auth.signInWithEmailAndPassword(
@@ -17,6 +24,7 @@ class AuthService {
     await ensureUserDoc(cred.user);
     return cred;
   }
+
   Future<UserCredential> registerEmail(String email, String password) async {
     final cred = await _auth.createUserWithEmailAndPassword(
       email: email.trim(),
@@ -25,7 +33,8 @@ class AuthService {
     await ensureUserDoc(cred.user);
     return cred;
   }
-    Future<void> createUserWithRole({
+
+  Future<void> createUserWithRole({
     required String email,
     required String password,
     required String name,
@@ -48,48 +57,49 @@ class AuthService {
   }
 
   Future<void> createUserWithRoleSecondaryApp({
-  required String email,
-  required String password,
-  required String name,
-  required String role,
-}) async {
-  // Create a secondary Firebase app so current super admin stays logged in
-  final secondaryApp = await Firebase.initializeApp(
-    name: "SecondaryApp",
-    options: Firebase.app().options,
-  );
+    required String email,
+    required String password,
+    required String name,
+    required String role,
+  }) async {
+    // Create a secondary Firebase app so current super admin stays logged in
+    final secondaryApp = await Firebase.initializeApp(
+      name: "SecondaryApp",
+      options: Firebase.app().options,
+    );
 
-  final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
+    final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
 
-  final cred = await secondaryAuth.createUserWithEmailAndPassword(
-    email: email.trim(),
-    password: password.trim(),
-  );
+    final cred = await secondaryAuth.createUserWithEmailAndPassword(
+      email: email.trim(),
+      password: password.trim(),
+    );
 
-  await _db.collection("users").doc(cred.user!.uid).set({
-    "uid": cred.user!.uid,
-    "email": email.trim(),
-    "name": name.trim(),
-    "role": role,
-    "createdAt": FieldValue.serverTimestamp(),
-  }, SetOptions(merge: true));
+    await _db.collection("users").doc(cred.user!.uid).set({
+      "uid": cred.user!.uid,
+      "email": email.trim(),
+      "name": name.trim(),
+      "role": role,
+      "createdAt": FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
 
-  // Sign out secondary and delete app instance
-  await secondaryAuth.signOut();
-  await secondaryApp.delete();
-}
-
+    // Sign out secondary and delete app instance
+    await secondaryAuth.signOut();
+    await secondaryApp.delete();
+  }
 
   Future<UserCredential> signInGoogle() async {
-    final googleUser = await GoogleSignIn().signIn();
-    if (googleUser == null) {
-      throw Exception("Google sign-in canceled");
+    await _ensureGoogleSignInInitialized();
+
+    final googleUser = await _googleSignIn.authenticate();
+
+    final googleAuth = googleUser.authentication;
+    if (googleAuth.idToken == null || googleAuth.idToken!.isEmpty) {
+      throw Exception("Google sign-in failed: missing ID token");
     }
 
-    final googleAuth = await googleUser.authentication;
     final credential = GoogleAuthProvider.credential(
       idToken: googleAuth.idToken,
-      accessToken: googleAuth.accessToken,
     );
 
     final cred = await _auth.signInWithCredential(credential);
@@ -98,7 +108,17 @@ class AuthService {
   }
 
   Future<void> signOut() async {
-    try { await GoogleSignIn().signOut(); } catch (_) {}
+    final uid = _auth.currentUser?.uid;
+    if (uid != null) {
+      try {
+        await AppLockService().clearLocalPinForLogout(uid);
+      } catch (_) {}
+    }
+
+    try {
+      await _ensureGoogleSignInInitialized();
+      await _googleSignIn.signOut();
+    } catch (_) {}
     await _auth.signOut();
   }
 
@@ -124,7 +144,8 @@ class AuthService {
       // Optional: keep superadmin enforced even if doc exists
       final data = doc.data() ?? {};
       final currentRole = (data["role"] ?? "employee").toString();
-      if (user.email?.toLowerCase() == superAdminEmail && currentRole != "super_admin") {
+      if (user.email?.toLowerCase() == superAdminEmail &&
+          currentRole != "super_admin") {
         await ref.update({"role": "super_admin"});
       }
     }
