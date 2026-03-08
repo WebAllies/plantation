@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:iot_aqua_app/core/device/device_selector_header.dart';
 import 'package:iot_aqua_app/ai/my_scan_history_page.dart';
 
+// ✅ NEW: Harvest prediction pages (adjust paths if needed)
+import 'ai_harvest_prediction_page.dart';
+import 'ai_harvest_history_page.dart';
+
 import 'ai_scan_page.dart';
 import 'ai_weather_page.dart';
 
@@ -12,13 +16,14 @@ class AiInsightPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("AI Insight "),
+        title: const Text("AI Insight"),
         bottom: const DeviceSelectorHeaderBottom(),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
+        child: ListView(
           children: [
+            // ✅ 1) Disease scan
             Card(
               child: ListTile(
                 leading: const Icon(Icons.camera_alt),
@@ -35,11 +40,13 @@ class AiInsightPage extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
+            // ✅ 2) Weather AI
             Card(
               child: ListTile(
                 leading: const Icon(Icons.cloud),
                 title: const Text("Weather AI (Forecast Automation)"),
-                subtitle: const Text("Rain → reduce irrigation • Heat → increase circulation"),
+                subtitle: const Text(
+                    "Rain → reduce irrigation • Heat → increase circulation"),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                 onTap: () {
                   Navigator.push(
@@ -51,6 +58,49 @@ class AiInsightPage extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
+            // ✅ 3) NEW: Harvest prediction (live)
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.agriculture),
+                title: const Text("AI Harvest Prediction"),
+                subtitle: const Text("Uses pH + TDS + Temperature + Water Level"),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AiHarvestPredictionPage(
+                        deviceId: "esp32_sim_01",
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // ✅ 4) NEW: Harvest prediction history
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.history_edu),
+                title: const Text("Harvest Prediction History"),
+                subtitle: const Text("View saved harvest predictions"),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AiHarvestHistoryPage(
+                        deviceId: "esp32_sim_01",
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // ✅ 5) Disease scan history
             Card(
               child: ListTile(
                 leading: const Icon(Icons.history),
@@ -70,7 +120,7 @@ class AiInsightPage extends StatelessWidget {
 
             const SizedBox(height: 12),
             const Text(
-              "Later we will connect this with real sensor data + disease detection model.",
+              "AI modules: Disease Detection • Weather Automation • Harvest Prediction.",
             ),
           ],
         ),
@@ -79,52 +129,80 @@ class AiInsightPage extends StatelessWidget {
   }
 }
 
+/// ✅ Updated AI Engine (matches YOUR sensor fields)
+/// devices/{deviceId} fields: ph, tdsPpm, temperatureC, waterLevelPct
 class AIEngine {
   static AIResult analyze({
     required double ph,
-    required double temperature,
-    required double waterLevel,
-    required double ec,
+    required double temperatureC,
+    required double waterLevelPct,
+    required double tdsPpm,
   }) {
     int score = 100;
     List<String> risks = [];
     List<String> recommendations = [];
 
-    if (ph < 6.0 || ph > 7.2) {
+    // ✅ Lettuce: pH ~ 5.8–6.5
+    if (ph < 5.8 || ph > 6.5) {
       score -= 20;
-      risks.add("pH level out of optimal range.");
-      recommendations.add("Adjust nutrient solution to stabilize pH.");
+      risks.add("pH out of ideal range (5.8–6.5).");
+      recommendations.add("Use pH up/down valves to stabilize pH.");
+    } else {
+      recommendations.add("pH is optimal for nutrient absorption.");
     }
 
-    if (temperature < 22 || temperature > 28) {
+    // ✅ Lettuce: temp ~ 20–26°C
+    if (temperatureC < 20 || temperatureC > 26) {
       score -= 15;
-      risks.add("Water temperature is not optimal.");
-      recommendations.add("Adjust shading or aeration.");
+      risks.add("Water temperature not ideal (20–26°C).");
+      recommendations.add("Improve circulation / shading / aeration.");
+    } else {
+      recommendations.add("Temperature supports healthy growth.");
     }
 
-    if (waterLevel < 30) {
+    // ✅ Water level should be stable (>= 60%)
+    if (waterLevelPct < 60) {
       score -= 10;
-      risks.add("Low water level detected.");
-      recommendations.add("Refill water tank.");
+      risks.add("Water level low (< 60%).");
+      recommendations.add("Auto-fill tank (water level valve).");
+    } else {
+      recommendations.add("Water level is stable.");
     }
 
-    if (ec < 1.4 || ec > 2.2) {
+    // ✅ Lettuce nutrient (TDS) ~ 560–840 ppm
+    if (tdsPpm < 560) {
+      score -= 15;
+      risks.add("Nutrients low (TDS < 560 ppm).");
+      recommendations.add("Increase feeding/nutrient dosing.");
+    } else if (tdsPpm > 840) {
       score -= 10;
-      risks.add("Nutrient concentration imbalance.");
-      recommendations.add("Adjust nutrient dosage.");
+      risks.add("Nutrients high (TDS > 840 ppm).");
+      recommendations.add("Dilute solution / reduce dosing.");
+    } else {
+      recommendations.add("Nutrient concentration is in good range.");
     }
 
-    if (risks.isEmpty) {
-      recommendations.add("System operating optimally.");
-    }
+    if (score < 0) score = 0;
+    if (score > 100) score = 100;
 
-    int harvestDays = 30 - ((score - 60) ~/ 5);
+    // ✅ Predict harvest days (simple mapping)
+    // better score -> fewer days
+    int harvestDays;
+    if (score >= 85) {
+      harvestDays = 10;
+    } else if (score >= 70) {
+      harvestDays = 14;
+    } else if (score >= 50) {
+      harvestDays = 20;
+    } else {
+      harvestDays = 28;
+    }
 
     return AIResult(
       score: score,
       risks: risks,
       recommendations: recommendations,
-      harvestDays: harvestDays.clamp(5, 40),
+      harvestDays: harvestDays,
     );
   }
 }
