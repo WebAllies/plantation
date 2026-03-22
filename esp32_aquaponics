@@ -1,0 +1,782 @@
+#include <WiFi.h>
+#include <Firebase_ESP_Client.h>
+#include <WebSocketsServer.h>
+#include <WiFiClientSecure.h>
+#include <PubSubClient.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#include <math.h>
+#include <time.h>
+
+#include "addons/TokenHelper.h"
+#include "addons/RTDBHelper.h"
+
+// -------------------- WIFI --------------------
+#define WIFI_SSID "Seif_2.4GHz"
+#define WIFI_PASS "Repiphany2"
+
+// -------------------- FIREBASE --------------------
+#define API_KEY "AIzaSyCKU-jSEXoftXGq9653hJql7YWXG7_Rtr8"
+#define FIREBASE_PROJECT_ID "iotaquaapp"
+#define USER_EMAIL "device@iot.com"
+#define USER_PASSWORD "device12345"
+
+// -------------------- MQTT --------------------
+#define MQTT_BROKER_HOST "9b2acde209524e8788afd4921fd6c347.s1.eu.hivemq.cloud"
+#define MQTT_BROKER_PORT 8883
+#define MQTT_USERNAME "plantation_app"
+#define MQTT_PASSWORD "Shuaib123"
+
+// -------------------- DEVICE --------------------
+#define DEVICE_ID "esp32_aquaponics_01"
+const char *deviceId = DEVICE_ID;
+const uint16_t WS_PORT = 81;
+
+// -------------------- GPIO --------------------
+const int TEMP_ONEWIRE_PIN = 4;
+
+// UART from optional Arduino Uno. Protect ESP32 RX from 5V Uno TX with a level shifter/divider.
+const bool USE_UNO_UART = true;
+const int UNO_UART_RX_PIN = 16;
+const int UNO_UART_TX_PIN = 17;
+const uint32_t UNO_UART_BAUD = 9600;
+const unsigned long UNO_DATA_TIMEOUT_MS = 15000;
+
+// Sensor and sampling settings
+const unsigned long SENSOR_INTERVAL_MS = 1000;
+const unsigned long STATUS_INTERVAL_MS = 5000;
+const unsigned long CMD_POLL_INTERVAL_MS = 2000;
+const unsigned long HISTORY_INTERVAL_MS = 300000;
+const unsigned long MQTT_RECONNECT_INTERVAL_MS = 5000;
+const char *NTP_SERVER_1 = "pool.ntp.org";
+const char *NTP_SERVER_2 = "time.google.com";
+const char *NTP_SERVER_3 = "time.nist.gov";
+
+const float PH_MIN_VALID = 0.0f;
+const float PH_MAX_VALID = 14.0f;
+const float TDS_MIN_VALID = 0.0f;
+const float TDS_MAX_VALID = 3000.0f;
+
+const float TEMP_MIN_VALID = 0.0f;
+const float TEMP_MAX_VALID = 45.0f;
+
+const int SENSOR_FAILURE_DEGRADED_THRESHOLD = 3;
+
+float temperatureC = 24.5f;
+float ph = 6.8f;
+float waterLevelPct = 82.0f;
+float tdsPpm = 900.0f;
+float phUpTankLevelPct = 100.0f;
+float phDownTankLevelPct = 100.0f;
+float nutrientTankLevelPct = 100.0f;
+
+bool lastReadOk = true;
+uint32_t sampleCount = 0;
+String sensorStatus = "booting";
+
+String wsUrl = "";
+String mqttTopicLive = "";
+String mqttStatusTopic = "";
+
+FirebaseData fbdo;
+FirebaseAuth auth;
+FirebaseConfig config;
+
+WebSocketsServer wsServer(WS_PORT);
+WiFiClientSecure mqttSecureClient;
+PubSubClient mqttClient(mqttSecureClient);
+HardwareSerial unoSerial(2);
+OneWire oneWire(TEMP_ONEWIRE_PIN);
+DallasTemperature waterTempSensor(&oneWire);
+
+unsigned long lastSensorMs = 0;
+unsigned long lastStatusMs = 0;
+unsigned long lastCmdPollMs = 0;
+unsigned long lastHistoryMs = 0;
+unsigned long lastMqttReconnectAttemptMs = 0;
+
+struct UnoTelemetry {
+  bool hasPh = false;
+  bool hasTds = false;
+  bool hasFishLevel = false;
+  bool hasPhUpLevel = false;
+  bool hasPhDownLevel = false;
+  bool hasNutrientLevel = false;
+  float phValue = NAN;
+  float tdsValue = NAN;
+  float fishLevelPct = NAN;
+  float phUpLevelPct = NAN;
+  float phDownLevelPct = NAN;
+  float nutrientLevelPct = NAN;
+  unsigned long lastUpdateMs = 0;
+  String lineBuffer = "";
+};
+
+struct SensorChannel {
+  const char *name;
+  float value;
+  float lastGoodValue;
+  uint8_t consecutiveFailures;
+  bool lastCycleOk;
+};
+
+UnoTelemetry unoTelemetry;
+SensorChannel phChannel = {"ph", 6.8f, 6.8f, 0, true};
+SensorChannel tdsChannel = {"tds", 900.0f, 900.0f, 0, true};
+SensorChannel tempChannel = {"temperature", 24.5f, 24.5f, 0, true};
+SensorChannel fishLevelChannel = {"fishTankLevel", 82.0f, 82.0f, 0, true};
+SensorChannel phUpLevelChannel = {"phUpTankLevel", 100.0f, 100.0f, 0, true};
+SensorChannel phDownLevelChannel = {"phDownTankLevel", 100.0f, 100.0f, 0, true};
+SensorChannel nutrientLevelChannel = {"nutrientTankLevel", 100.0f, 100.0f, 0, true};
+
+String deviceDocPath() {
+  return String("devices/") + deviceId;
+}
+
+String commandsColPath() {
+  return String("devices/") + deviceId + "/commands";
+}
+
+String logsColPath() {
+  return String("devices/") + deviceId + "/logs";
+}
+
+String readingsColPath() {
+  return String("devices/") + deviceId + "/readings";
+}
+
+bool hasValidUtcTime() {
+  return time(nullptr) >= 1700000000;
+}
+
+String firestoreTimestampNow() {
+  time_t now = time(nullptr);
+  if (now < 1700000000) return "";
+
+  struct tm utcTm;
+  gmtime_r(&now, &utcTm);
+
+  char ts[25];
+  strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%SZ", &utcTm);
+  return String(ts);
+}
+
+bool setTimestampField(FirebaseJson &content, const String &path) {
+  String ts = firestoreTimestampNow();
+  if (ts.length() == 0) {
+    Serial.println("[Firestore] skip write: UTC time not synchronized yet");
+    return false;
+  }
+  content.set(path.c_str(), ts);
+  return true;
+}
+
+bool waitForValidUtcTime(unsigned long timeoutMs) {
+  unsigned long start = millis();
+  while (!hasValidUtcTime() && millis() - start < timeoutMs) {
+    delay(200);
+    Serial.print(".");
+  }
+  return hasValidUtcTime();
+}
+
+bool syncUtcTimeViaNtp(unsigned long timeoutMs) {
+  configTime(0, 0, NTP_SERVER_1, NTP_SERVER_2, NTP_SERVER_3);
+  return waitForValidUtcTime(timeoutMs);
+}
+
+void printFirestoreResult(const String &operation, bool ok) {
+  if (ok) {
+    Serial.println("[Firestore] " + operation + " OK");
+    return;
+  }
+  Serial.println("[Firestore] " + operation + " FAIL: " + fbdo.errorReason());
+}
+
+float clampFloat(float value, float minValue, float maxValue) {
+  if (value < minValue) return minValue;
+  if (value > maxValue) return maxValue;
+  return value;
+}
+
+float round2(float value) {
+  return roundf(value * 100.0f) / 100.0f;
+}
+
+String epochMillisString() {
+  time_t now = time(nullptr);
+  if (now < 1700000000) {
+    return String((unsigned long)millis());
+  }
+  unsigned long long epochMs = ((unsigned long long)now) * 1000ULL;
+  return String(epochMs);
+}
+
+bool updateChannel(SensorChannel &channel, float candidateValue, float minValue, float maxValue) {
+  bool valid = isfinite(candidateValue) && candidateValue >= minValue && candidateValue <= maxValue;
+  channel.lastCycleOk = valid;
+
+  if (valid) {
+    channel.value = round2(candidateValue);
+    channel.lastGoodValue = channel.value;
+    channel.consecutiveFailures = 0;
+    return true;
+  }
+
+  channel.consecutiveFailures++;
+  channel.value = channel.lastGoodValue;
+  return false;
+}
+
+String channelStateLabel(const SensorChannel &channel) {
+  if (channel.consecutiveFailures >= SENSOR_FAILURE_DEGRADED_THRESHOLD) {
+    return "degraded";
+  }
+  return channel.lastCycleOk ? "ok" : "stale";
+}
+
+void refreshSensorStatusSummary() {
+  lastReadOk =
+    phChannel.lastCycleOk &&
+    tdsChannel.lastCycleOk &&
+    tempChannel.lastCycleOk &&
+    fishLevelChannel.lastCycleOk &&
+    phUpLevelChannel.lastCycleOk &&
+    phDownLevelChannel.lastCycleOk &&
+    nutrientLevelChannel.lastCycleOk;
+
+  sensorStatus =
+    String("ph=") + channelStateLabel(phChannel) +
+    ",tds=" + channelStateLabel(tdsChannel) +
+    ",temp=" + channelStateLabel(tempChannel) +
+    ",fish=" + channelStateLabel(fishLevelChannel) +
+    ",phUp=" + channelStateLabel(phUpLevelChannel) +
+    ",phDown=" + channelStateLabel(phDownLevelChannel) +
+    ",nutrient=" + channelStateLabel(nutrientLevelChannel);
+}
+
+void parseUnoLine(const String &line) {
+  int sep = line.indexOf(':');
+  if (sep <= 0) return;
+
+  String key = line.substring(0, sep);
+  String rawValue = line.substring(sep + 1);
+  key.trim();
+  rawValue.trim();
+  key.toUpperCase();
+
+  if (rawValue.length() == 0) return;
+
+  float value = rawValue.toFloat();
+  if (!isfinite(value)) return;
+
+  if (key == "PH") {
+    unoTelemetry.phValue = value;
+    unoTelemetry.hasPh = true;
+    unoTelemetry.lastUpdateMs = millis();
+  } else if (key == "TDS") {
+    unoTelemetry.tdsValue = value;
+    unoTelemetry.hasTds = true;
+    unoTelemetry.lastUpdateMs = millis();
+  } else if (key == "FISH") {
+    unoTelemetry.fishLevelPct = value;
+    unoTelemetry.hasFishLevel = true;
+    unoTelemetry.lastUpdateMs = millis();
+  } else if (key == "PHUP") {
+    unoTelemetry.phUpLevelPct = value;
+    unoTelemetry.hasPhUpLevel = true;
+    unoTelemetry.lastUpdateMs = millis();
+  } else if (key == "PHDOWN") {
+    unoTelemetry.phDownLevelPct = value;
+    unoTelemetry.hasPhDownLevel = true;
+    unoTelemetry.lastUpdateMs = millis();
+  } else if (key == "NUTRIENT") {
+    unoTelemetry.nutrientLevelPct = value;
+    unoTelemetry.hasNutrientLevel = true;
+    unoTelemetry.lastUpdateMs = millis();
+  }
+}
+
+void pollUnoSerial() {
+  if (!USE_UNO_UART) return;
+
+  while (unoSerial.available()) {
+    char ch = (char)unoSerial.read();
+    if (ch == '\r') continue;
+    if (ch == '\n') {
+      if (unoTelemetry.lineBuffer.length() > 0) {
+        parseUnoLine(unoTelemetry.lineBuffer);
+        unoTelemetry.lineBuffer = "";
+      }
+      continue;
+    }
+    if (unoTelemetry.lineBuffer.length() < 64) {
+      unoTelemetry.lineBuffer += ch;
+    } else {
+      unoTelemetry.lineBuffer = "";
+    }
+  }
+
+  if (millis() - unoTelemetry.lastUpdateMs > UNO_DATA_TIMEOUT_MS) {
+    unoTelemetry.hasPh = false;
+    unoTelemetry.hasTds = false;
+    unoTelemetry.hasFishLevel = false;
+    unoTelemetry.hasPhUpLevel = false;
+    unoTelemetry.hasPhDownLevel = false;
+    unoTelemetry.hasNutrientLevel = false;
+  }
+}
+
+float readTemperatureC() {
+  waterTempSensor.requestTemperatures();
+  float temp = waterTempSensor.getTempCByIndex(0);
+  if (!isfinite(temp) || temp == DEVICE_DISCONNECTED_C) return NAN;
+  return temp;
+}
+
+float resolvePhReading() {
+  if (USE_UNO_UART && unoTelemetry.hasPh) return unoTelemetry.phValue;
+  return NAN;
+}
+
+float resolveTdsReading(float currentTemperature) {
+  (void) currentTemperature;
+  if (USE_UNO_UART && unoTelemetry.hasTds) return unoTelemetry.tdsValue;
+  return NAN;
+}
+
+void acquireSensors() {
+  pollUnoSerial();
+
+  float tempCandidate = readTemperatureC();
+  updateChannel(tempChannel, tempCandidate, TEMP_MIN_VALID, TEMP_MAX_VALID);
+
+  float effectiveTemp = tempChannel.value;
+  float phCandidate = resolvePhReading();
+  float tdsCandidate = resolveTdsReading(effectiveTemp);
+  float fishLevelCandidate = unoTelemetry.hasFishLevel ? unoTelemetry.fishLevelPct : NAN;
+  float phUpCandidate = unoTelemetry.hasPhUpLevel ? unoTelemetry.phUpLevelPct : NAN;
+  float phDownCandidate = unoTelemetry.hasPhDownLevel ? unoTelemetry.phDownLevelPct : NAN;
+  float nutrientCandidate = unoTelemetry.hasNutrientLevel ? unoTelemetry.nutrientLevelPct : NAN;
+
+  updateChannel(phChannel, phCandidate, PH_MIN_VALID, PH_MAX_VALID);
+  updateChannel(tdsChannel, tdsCandidate, TDS_MIN_VALID, TDS_MAX_VALID);
+  updateChannel(fishLevelChannel, fishLevelCandidate, 0.0f, 100.0f);
+  updateChannel(phUpLevelChannel, phUpCandidate, 0.0f, 100.0f);
+  updateChannel(phDownLevelChannel, phDownCandidate, 0.0f, 100.0f);
+  updateChannel(nutrientLevelChannel, nutrientCandidate, 0.0f, 100.0f);
+
+  temperatureC = tempChannel.value;
+  ph = phChannel.value;
+  tdsPpm = tdsChannel.value;
+  waterLevelPct = fishLevelChannel.value;
+  phUpTankLevelPct = phUpLevelChannel.value;
+  phDownTankLevelPct = phDownLevelChannel.value;
+  nutrientTankLevelPct = nutrientLevelChannel.value;
+  sampleCount++;
+
+  refreshSensorStatusSummary();
+}
+
+String buildSnapshotJson() {
+  FirebaseJson js;
+  js.set("deviceId", deviceId);
+  js.set("tsEpochMs", epochMillisString());
+  js.set("temperatureC", temperatureC);
+  js.set("ph", ph);
+  js.set("waterLevelPct", waterLevelPct);
+  js.set("tdsPpm", tdsPpm);
+  js.set("phUpTankLevelPct", phUpTankLevelPct);
+  js.set("phDownTankLevelPct", phDownTankLevelPct);
+  js.set("nutrientTankLevelPct", nutrientTankLevelPct);
+  js.set("sensorStatus", sensorStatus);
+  js.set("lastReadOk", lastReadOk);
+  js.set("sampleCount", (int)sampleCount);
+  js.set("rssi", WiFi.RSSI());
+
+  String out;
+  js.toString(out, false);
+  return out;
+}
+
+String buildStatusJson(const String &status) {
+  FirebaseJson js;
+  js.set("deviceId", deviceId);
+  js.set("status", status);
+  js.set("tsEpochMs", epochMillisString());
+
+  String out;
+  js.toString(out, false);
+  return out;
+}
+
+bool connectMqtt() {
+  if (mqttClient.connected()) return true;
+
+  if (mqttTopicLive.length() == 0 || mqttStatusTopic.length() == 0) {
+    return false;
+  }
+
+  String clientId = String("esp32-aqua-") + deviceId + "-" + String(esp_random(), HEX);
+  String willPayload = buildStatusJson("offline");
+  bool ok = mqttClient.connect(
+    clientId.c_str(),
+    MQTT_USERNAME,
+    MQTT_PASSWORD,
+    mqttStatusTopic.c_str(),
+    1,
+    true,
+    willPayload.c_str()
+  );
+
+  if (!ok) {
+    Serial.printf("[MQTT] connect failed (state=%d)\n", mqttClient.state());
+    return false;
+  }
+
+  String onlinePayload = buildStatusJson("online");
+  mqttClient.publish(mqttStatusTopic.c_str(), onlinePayload.c_str(), true);
+  Serial.println("[MQTT] connected");
+  return true;
+}
+
+void ensureMqttConnected() {
+  if (mqttClient.connected()) return;
+  if (millis() - lastMqttReconnectAttemptMs < MQTT_RECONNECT_INTERVAL_MS) return;
+
+  lastMqttReconnectAttemptMs = millis();
+  connectMqtt();
+}
+
+void publishMqttSnapshot() {
+  if (!mqttClient.connected()) return;
+  if (mqttTopicLive.length() == 0) return;
+
+  String payload = buildSnapshotJson();
+  mqttClient.publish(mqttTopicLive.c_str(), payload.c_str(), false);
+}
+
+void broadcastSnapshot() {
+  String payload = buildSnapshotJson();
+  wsServer.broadcastTXT(payload);
+}
+
+void logEvent(const String &level, const String &event, const String &detail) {
+  FirebaseJson content;
+  if (!setTimestampField(content, "fields/ts/timestampValue")) return;
+  content.set("fields/level/stringValue", level);
+  content.set("fields/event/stringValue", event);
+  content.set("fields/detail/stringValue", detail);
+  content.set("fields/by/stringValue", "esp32_aquaponics");
+
+  bool ok = Firebase.Firestore.createDocument(
+    &fbdo,
+    FIREBASE_PROJECT_ID,
+    "",
+    logsColPath().c_str(),
+    content.raw()
+  );
+  printFirestoreResult("logEvent", ok);
+}
+
+void setDeviceFields(FirebaseJson &content) {
+  content.set("fields/name/stringValue", "Aquaponics ESP32");
+  content.set("fields/online/booleanValue", true);
+  content.set("fields/rssi/integerValue", String(WiFi.RSSI()));
+  content.set("fields/temperatureC/doubleValue", temperatureC);
+  content.set("fields/ph/doubleValue", ph);
+  content.set("fields/waterLevelPct/doubleValue", waterLevelPct);
+  content.set("fields/tdsPpm/doubleValue", tdsPpm);
+  content.set("fields/phUpTankLevelPct/doubleValue", phUpTankLevelPct);
+  content.set("fields/phDownTankLevelPct/doubleValue", phDownTankLevelPct);
+  content.set("fields/nutrientTankLevelPct/doubleValue", nutrientTankLevelPct);
+  content.set("fields/sensorStatus/stringValue", sensorStatus);
+  content.set("fields/lastReadOk/booleanValue", lastReadOk);
+  content.set("fields/sampleCount/integerValue", String(sampleCount));
+  content.set("fields/wsUrl/stringValue", wsUrl);
+  content.set("fields/realtimeTransport/stringValue", "mqtt");
+  content.set("fields/mqttTopicLive/stringValue", mqttTopicLive);
+  content.set("fields/mqttStatusTopic/stringValue", mqttStatusTopic);
+  content.set("fields/mqttEnabled/booleanValue", true);
+  content.set("fields/simulator/booleanValue", false);
+}
+
+void updateDeviceStatus(bool online) {
+  FirebaseJson content;
+  setDeviceFields(content);
+  content.set("fields/online/booleanValue", online);
+  if (!setTimestampField(content, "fields/lastSeen/timestampValue")) return;
+
+  bool patchOk = Firebase.Firestore.patchDocument(
+    &fbdo,
+    FIREBASE_PROJECT_ID,
+    "",
+    deviceDocPath().c_str(),
+    content.raw(),
+    "name,online,lastSeen,rssi,temperatureC,ph,waterLevelPct,tdsPpm,phUpTankLevelPct,phDownTankLevelPct,nutrientTankLevelPct,sensorStatus,lastReadOk,sampleCount,wsUrl,realtimeTransport,mqttTopicLive,mqttStatusTopic,mqttEnabled,simulator"
+  );
+  printFirestoreResult("updateDeviceStatus", patchOk);
+}
+
+void writeReadingSnapshot() {
+  FirebaseJson content;
+  if (!setTimestampField(content, "fields/ts/timestampValue")) return;
+  content.set("fields/temperatureC/doubleValue", temperatureC);
+  content.set("fields/ph/doubleValue", ph);
+  content.set("fields/waterLevelPct/doubleValue", waterLevelPct);
+  content.set("fields/tdsPpm/doubleValue", tdsPpm);
+  content.set("fields/phUpTankLevelPct/doubleValue", phUpTankLevelPct);
+  content.set("fields/phDownTankLevelPct/doubleValue", phDownTankLevelPct);
+  content.set("fields/nutrientTankLevelPct/doubleValue", nutrientTankLevelPct);
+  content.set("fields/sensorStatus/stringValue", sensorStatus);
+  content.set("fields/lastReadOk/booleanValue", lastReadOk);
+  content.set("fields/sampleCount/integerValue", String(sampleCount));
+  content.set("fields/rssi/integerValue", String(WiFi.RSSI()));
+
+  bool ok = Firebase.Firestore.createDocument(
+    &fbdo,
+    FIREBASE_PROJECT_ID,
+    "",
+    readingsColPath().c_str(),
+    content.raw()
+  );
+  printFirestoreResult("writeReadingSnapshot", ok);
+}
+
+bool ensureDeviceDocument() {
+  FirebaseJson content;
+  setDeviceFields(content);
+  content.set("fields/online/booleanValue", true);
+  if (!setTimestampField(content, "fields/lastSeen/timestampValue")) return false;
+  if (!setTimestampField(content, "fields/createdAt/timestampValue")) return false;
+
+  bool created = Firebase.Firestore.createDocument(
+    &fbdo,
+    FIREBASE_PROJECT_ID,
+    "",
+    "devices",
+    deviceId,
+    content.raw(),
+    ""
+  );
+  if (created) {
+    printFirestoreResult("ensureDeviceDocument create", true);
+    return true;
+  }
+
+  String reason = fbdo.errorReason();
+  if (reason.indexOf("ALREADY_EXISTS") >= 0 ||
+      reason.indexOf("already exists") >= 0 ||
+      reason.indexOf("409") >= 0) {
+    Serial.println("[Firestore] ensureDeviceDocument: existing document found");
+    return true;
+  }
+
+  printFirestoreResult("ensureDeviceDocument create", false);
+  return false;
+}
+
+void executeCommand(const String &docFullName, const String &type, bool targetState) {
+  int idx = docFullName.indexOf("/documents/");
+  if (idx < 0) return;
+  String docPath = docFullName.substring(idx + 11);
+
+  Serial.printf(
+    "Executing command: %s -> %s\n",
+    type.c_str(),
+    targetState ? "true" : "false"
+  );
+
+  (void) targetState;
+  bool ok = false;
+  String msg = "Actuator commands are disabled until relay wiring is defined";
+  logEvent("warn", "command_ignored", "Ignored command type while actuators are disabled: " + type);
+
+  updateDeviceStatus(true);
+  broadcastSnapshot();
+  publishMqttSnapshot();
+
+  FirebaseJson patch;
+  patch.set("fields/status/stringValue", ok ? "executed" : "failed");
+  patch.set("fields/message/stringValue", msg);
+  String updateMask = "status,message";
+  if (setTimestampField(patch, "fields/executedAt/timestampValue")) {
+    updateMask = "status,message,executedAt";
+  }
+
+  bool patchOk = Firebase.Firestore.patchDocument(
+    &fbdo,
+    FIREBASE_PROJECT_ID,
+    "",
+    docPath.c_str(),
+    patch.raw(),
+    updateMask.c_str()
+  );
+  printFirestoreResult("executeCommand patch", patchOk);
+}
+
+void pollLatestPendingCommand() {
+  bool ok = Firebase.Firestore.listDocuments(
+    &fbdo,
+    FIREBASE_PROJECT_ID,
+    "",
+    commandsColPath().c_str(),
+    10,
+    "",
+    "",
+    "",
+    false
+  );
+  if (!ok) {
+    printFirestoreResult("pollLatestPendingCommand listDocuments", false);
+    return;
+  }
+  printFirestoreResult("pollLatestPendingCommand listDocuments", true);
+
+  FirebaseJson js;
+  js.setJsonData(fbdo.payload());
+
+  FirebaseJsonData arr;
+  js.get(arr, "documents");
+  if (!arr.success) return;
+
+  FirebaseJsonArray docs;
+  docs.setJsonArrayData(arr.stringValue);
+  for (size_t i = 0; i < docs.size(); i++) {
+    FirebaseJsonData docData;
+    docs.get(docData, i);
+    if (!docData.success) continue;
+
+    FirebaseJson docJson;
+    docJson.setJsonData(docData.stringValue);
+
+    FirebaseJsonData nameData;
+    FirebaseJsonData statusData;
+    FirebaseJsonData typeData;
+    FirebaseJsonData targetData;
+
+    docJson.get(nameData, "name");
+    docJson.get(statusData, "fields/status/stringValue");
+    docJson.get(typeData, "fields/type/stringValue");
+    docJson.get(targetData, "fields/targetState/booleanValue");
+
+    if (!nameData.success || !statusData.success || !typeData.success || !targetData.success) {
+      continue;
+    }
+
+    if (statusData.stringValue == "pending") {
+      executeCommand(nameData.stringValue, typeData.stringValue, targetData.boolValue);
+      return;
+    }
+  }
+}
+
+void onWsEvent(uint8_t clientNum, WStype_t type, uint8_t *payload, size_t length) {
+  (void) payload;
+  (void) length;
+
+  if (type == WStype_CONNECTED) {
+    String payloadStr = buildSnapshotJson();
+    wsServer.sendTXT(clientNum, payloadStr);
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  if (USE_UNO_UART) {
+    unoSerial.begin(UNO_UART_BAUD, SERIAL_8N1, UNO_UART_RX_PIN, UNO_UART_TX_PIN);
+  }
+
+  waterTempSensor.begin();
+
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  Serial.print("WiFi connecting");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi connected");
+
+  mqttTopicLive = "plantation/" + String(deviceId) + "/telemetry/live";
+  mqttStatusTopic = "plantation/" + String(deviceId) + "/status";
+  wsUrl = "ws://" + WiFi.localIP().toString() + ":" + String(WS_PORT);
+  Serial.println("WebSocket endpoint: " + wsUrl);
+  Serial.println("MQTT live topic: " + mqttTopicLive);
+  Serial.println("MQTT status topic: " + mqttStatusTopic);
+
+  wsServer.begin();
+  wsServer.onEvent(onWsEvent);
+
+  mqttSecureClient.setInsecure();
+  mqttClient.setServer(MQTT_BROKER_HOST, MQTT_BROKER_PORT);
+  mqttClient.setKeepAlive(20);
+  mqttClient.setBufferSize(1536);
+  connectMqtt();
+
+  config.api_key = API_KEY;
+  auth.user.email = USER_EMAIL;
+  auth.user.password = USER_PASSWORD;
+  config.token_status_callback = tokenStatusCallback;
+
+  Firebase.begin(&config, &auth);
+  Firebase.reconnectWiFi(true);
+
+  Serial.print("Waiting Firebase auth");
+  unsigned long authStartMs = millis();
+  while (!Firebase.ready() && millis() - authStartMs < 20000) {
+    delay(200);
+    Serial.print(".");
+  }
+  Serial.println();
+
+  Serial.print("Waiting UTC time sync");
+  bool timeReady = syncUtcTimeViaNtp(30000);
+  Serial.println();
+  if (!timeReady) {
+    Serial.println("[Firestore] UTC time sync timeout; timestamped writes will retry later");
+  } else {
+    Serial.println("[Firestore] UTC time synchronized");
+  }
+
+  acquireSensors();
+  ensureDeviceDocument();
+  updateDeviceStatus(true);
+  writeReadingSnapshot();
+  publishMqttSnapshot();
+  broadcastSnapshot();
+  logEvent("info", "device_online", "Aquaponics ESP32 connected and reporting online");
+}
+
+void loop() {
+  wsServer.loop();
+  ensureMqttConnected();
+  mqttClient.loop();
+
+  if (millis() - lastSensorMs >= SENSOR_INTERVAL_MS) {
+    lastSensorMs = millis();
+    acquireSensors();
+    broadcastSnapshot();
+    publishMqttSnapshot();
+  }
+
+  if (!Firebase.ready()) {
+    delay(50);
+    return;
+  }
+
+  if (millis() - lastStatusMs >= STATUS_INTERVAL_MS) {
+    lastStatusMs = millis();
+    updateDeviceStatus(true);
+  }
+
+  if (millis() - lastCmdPollMs >= CMD_POLL_INTERVAL_MS) {
+    lastCmdPollMs = millis();
+    pollLatestPendingCommand();
+  }
+
+  if (millis() - lastHistoryMs >= HISTORY_INTERVAL_MS) {
+    lastHistoryMs = millis();
+    writeReadingSnapshot();
+  }
+}

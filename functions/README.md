@@ -136,6 +136,16 @@ Expected telemetry fields in `devices/{deviceId}`:
 - `waterLevelPct`
 - `tdsPpm`
 
+Optional monitoring-only telemetry fields that may also be present:
+- `phUpTankLevelPct`
+- `phDownTankLevelPct`
+- `nutrientTankLevelPct`
+- `sensorStatus`
+- `lastReadOk`
+- `sampleCount`
+
+These extra fields are allowed on device documents and reading snapshots but are not part of the current alert evaluation logic.
+
 ## Post-Deploy Verification
 1. Confirm deploy succeeded in Firebase Console -> Functions.
 2. Confirm `settings/sensors` exists in Firestore.

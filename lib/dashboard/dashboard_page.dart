@@ -20,6 +20,12 @@ class _TelemetryFrame {
   final double? ph;
   final double? waterLevelPct;
   final double? tdsPpm;
+  final double? phUpTankLevelPct;
+  final double? phDownTankLevelPct;
+  final double? nutrientTankLevelPct;
+  final String? sensorStatus;
+  final bool? lastReadOk;
+  final int? sampleCount;
   final bool? pumpState;
   final bool? valveState;
   final int? rssi;
@@ -31,6 +37,12 @@ class _TelemetryFrame {
     this.ph,
     this.waterLevelPct,
     this.tdsPpm,
+    this.phUpTankLevelPct,
+    this.phDownTankLevelPct,
+    this.nutrientTankLevelPct,
+    this.sensorStatus,
+    this.lastReadOk,
+    this.sampleCount,
     this.pumpState,
     this.valveState,
     this.rssi,
@@ -53,6 +65,19 @@ class _TelemetryFrame {
       waterLevelPct:
           _toDoubleValue(json['waterLevelPct']) ?? fallback?.waterLevelPct,
       tdsPpm: _toDoubleValue(json['tdsPpm']) ?? fallback?.tdsPpm,
+      phUpTankLevelPct:
+          _toDoubleValue(json['phUpTankLevelPct']) ??
+          fallback?.phUpTankLevelPct,
+      phDownTankLevelPct:
+          _toDoubleValue(json['phDownTankLevelPct']) ??
+          fallback?.phDownTankLevelPct,
+      nutrientTankLevelPct:
+          _toDoubleValue(json['nutrientTankLevelPct']) ??
+          fallback?.nutrientTankLevelPct,
+      sensorStatus:
+          _toStringValue(json['sensorStatus']) ?? fallback?.sensorStatus,
+      lastReadOk: _toBoolValue(json['lastReadOk']) ?? fallback?.lastReadOk,
+      sampleCount: _toIntValue(json['sampleCount']) ?? fallback?.sampleCount,
       pumpState: _toBoolValue(json['pumpState']) ?? fallback?.pumpState,
       valveState: _toBoolValue(json['valveState']) ?? fallback?.valveState,
       rssi: _toIntValue(json['rssi']) ?? fallback?.rssi,
@@ -82,6 +107,19 @@ class _TelemetryFrame {
       waterLevelPct:
           _toDoubleValue(data['waterLevelPct']) ?? fallback?.waterLevelPct,
       tdsPpm: _toDoubleValue(data['tdsPpm']) ?? fallback?.tdsPpm,
+      phUpTankLevelPct:
+          _toDoubleValue(data['phUpTankLevelPct']) ??
+          fallback?.phUpTankLevelPct,
+      phDownTankLevelPct:
+          _toDoubleValue(data['phDownTankLevelPct']) ??
+          fallback?.phDownTankLevelPct,
+      nutrientTankLevelPct:
+          _toDoubleValue(data['nutrientTankLevelPct']) ??
+          fallback?.nutrientTankLevelPct,
+      sensorStatus:
+          _toStringValue(data['sensorStatus']) ?? fallback?.sensorStatus,
+      lastReadOk: _toBoolValue(data['lastReadOk']) ?? fallback?.lastReadOk,
+      sampleCount: _toIntValue(data['sampleCount']) ?? fallback?.sampleCount,
       pumpState: _toBoolValue(data['pumpState']) ?? fallback?.pumpState,
       valveState: _toBoolValue(data['valveState']) ?? fallback?.valveState,
       rssi: _toIntValue(data['rssi']) ?? fallback?.rssi,

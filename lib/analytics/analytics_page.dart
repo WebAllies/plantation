@@ -891,6 +891,12 @@ class _TelemetryPoint {
   final double? tds;
   final double? temperature;
   final double? waterLevel;
+  final double? phUpTankLevelPct;
+  final double? phDownTankLevelPct;
+  final double? nutrientTankLevelPct;
+  final String? sensorStatus;
+  final bool? lastReadOk;
+  final int? sampleCount;
 
   _TelemetryPoint({
     required this.timestamp,
@@ -898,6 +904,12 @@ class _TelemetryPoint {
     required this.tds,
     required this.temperature,
     required this.waterLevel,
+    required this.phUpTankLevelPct,
+    required this.phDownTankLevelPct,
+    required this.nutrientTankLevelPct,
+    required this.sensorStatus,
+    required this.lastReadOk,
+    required this.sampleCount,
   });
 
   factory _TelemetryPoint.fromMap(Map<String, dynamic> map) {
@@ -911,6 +923,12 @@ class _TelemetryPoint {
       tds: (map['tdsPpm'] as num?)?.toDouble(),
       temperature: (map['temperatureC'] as num?)?.toDouble(),
       waterLevel: (map['waterLevelPct'] as num?)?.toDouble(),
+      phUpTankLevelPct: (map['phUpTankLevelPct'] as num?)?.toDouble(),
+      phDownTankLevelPct: (map['phDownTankLevelPct'] as num?)?.toDouble(),
+      nutrientTankLevelPct: (map['nutrientTankLevelPct'] as num?)?.toDouble(),
+      sensorStatus: map['sensorStatus']?.toString(),
+      lastReadOk: map['lastReadOk'] as bool?,
+      sampleCount: (map['sampleCount'] as num?)?.toInt(),
     );
   }
 }

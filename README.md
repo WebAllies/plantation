@@ -11,6 +11,9 @@ This README is deployment-focused. If you follow it in order, a new machine can 
 - Local ML training pipeline (`ml/`)
 - ESP32 firmware/simulator sketches (`esp32`, `esp32sim`)
 
+Hardware wiring for the current Uno + ESP32 aquaponics setup:
+- [WIRING_README.md](/mnt/e/shuaib/plantation/WIRING_README.md)
+
 ## Current AI Classes
 - `healthy`
 - `nitrogen_deficiency`
