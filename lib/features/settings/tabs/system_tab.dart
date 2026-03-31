@@ -102,12 +102,10 @@ class _SystemTabState extends State<SystemTab> {
           .collection("system")
           .doc("settings")
           .set({
-            if (enableNotifications != null)
-              "enableNotifications": enableNotifications,
-            if (autoMode != null) "autoMode": autoMode,
-            if (maintenanceMode != null) "maintenanceMode": maintenanceMode,
-            if (emergencyAlertsEnabled != null)
-              "emergencyAlertsEnabled": emergencyAlertsEnabled,
+            "enableNotifications": ?enableNotifications,
+            "autoMode": ?autoMode,
+            "maintenanceMode": ?maintenanceMode,
+            "emergencyAlertsEnabled": ?emergencyAlertsEnabled,
             "updatedAt": FieldValue.serverTimestamp(),
             "updatedBy": FirebaseAuth.instance.currentUser?.uid ?? "unknown",
           }, SetOptions(merge: true));
@@ -122,8 +120,9 @@ class _SystemTabState extends State<SystemTab> {
   }
 
   Future<void> _sendDeviceCommand({
-    required String type, // "pump" | "valve"
-    required bool targetState,
+    required String type,
+    bool? targetState,
+    int? durationMs,
   }) async {
     if (!_isAdmin) {
       _toast("Not allowed for this role.");
@@ -142,16 +141,20 @@ class _SystemTabState extends State<SystemTab> {
           .collection("commands")
           .add({
             "type": type,
-            "targetState": targetState,
             "status": "pending",
             "requestedBy": uid,
             "requestedByEmail": email,
             "requestedAt": FieldValue.serverTimestamp(),
+            "targetState": ?targetState,
+            "durationMs": ?durationMs,
           });
 
       if (!mounted) return;
       setState(() => _busy = false);
-      _toast("Command sent ✅ ($type = ${targetState ? "ON" : "OFF"})");
+      final suffix = durationMs != null
+          ? " for $durationMs ms"
+          : (targetState != null ? " = ${targetState ? "ON" : "OFF"}" : "");
+      _toast("Command sent ✅ ($type$suffix)");
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
@@ -478,62 +481,99 @@ class _SystemTabState extends State<SystemTab> {
                   "Send a manual command to device (writes to Firestore commands).",
                 ),
                 const SizedBox(height: 10),
-                Row(
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
                   children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _busy
-                            ? null
-                            : () => _sendDeviceCommand(
-                                  type: "pump",
-                                  targetState: true,
-                                ),
-                        icon: const Icon(Icons.water),
-                        label: const Text("Pump ON"),
-                      ),
+                    OutlinedButton.icon(
+                      onPressed: _busy
+                          ? null
+                          : () => _sendDeviceCommand(
+                                type: "ph_up",
+                                targetState: true,
+                              ),
+                      icon: const Icon(Icons.add),
+                      label: const Text("pH Up ON"),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _busy
-                            ? null
-                            : () => _sendDeviceCommand(
-                                  type: "pump",
-                                  targetState: false,
-                                ),
-                        icon: const Icon(Icons.water_drop_outlined),
-                        label: const Text("Pump OFF"),
-                      ),
+                    OutlinedButton.icon(
+                      onPressed: _busy
+                          ? null
+                          : () => _sendDeviceCommand(
+                                type: "ph_up",
+                                targetState: false,
+                              ),
+                      icon: const Icon(Icons.remove),
+                      label: const Text("pH Up OFF"),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _busy
-                            ? null
-                            : () => _sendDeviceCommand(
-                                  type: "valve",
-                                  targetState: true,
-                                ),
-                        icon: const Icon(Icons.tune),
-                        label: const Text("Valve OPEN"),
-                      ),
+                    OutlinedButton.icon(
+                      onPressed: _busy
+                          ? null
+                          : () => _sendDeviceCommand(
+                                type: "ph_down",
+                                targetState: true,
+                              ),
+                      icon: const Icon(Icons.exposure_minus_1),
+                      label: const Text("pH Down ON"),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _busy
-                            ? null
-                            : () => _sendDeviceCommand(
-                                  type: "valve",
-                                  targetState: false,
-                                ),
-                        icon: const Icon(Icons.close),
-                        label: const Text("Valve CLOSE"),
-                      ),
+                    OutlinedButton.icon(
+                      onPressed: _busy
+                          ? null
+                          : () => _sendDeviceCommand(
+                                type: "ph_down",
+                                targetState: false,
+                              ),
+                      icon: const Icon(Icons.exposure_neg_1),
+                      label: const Text("pH Down OFF"),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _busy
+                          ? null
+                          : () => _sendDeviceCommand(
+                                type: "nutrient",
+                                targetState: true,
+                              ),
+                      icon: const Icon(Icons.opacity),
+                      label: const Text("Nutrient ON"),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _busy
+                          ? null
+                          : () => _sendDeviceCommand(
+                                type: "nutrient",
+                                targetState: false,
+                              ),
+                      icon: const Icon(Icons.opacity_outlined),
+                      label: const Text("Nutrient OFF"),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _busy
+                          ? null
+                          : () => _sendDeviceCommand(
+                                type: "fish_to_filter",
+                                targetState: true,
+                              ),
+                      icon: const Icon(Icons.water),
+                      label: const Text("Transfer ON"),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _busy
+                          ? null
+                          : () => _sendDeviceCommand(
+                                type: "fish_to_filter",
+                                targetState: false,
+                              ),
+                      icon: const Icon(Icons.water_drop_outlined),
+                      label: const Text("Transfer OFF"),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _busy
+                          ? null
+                          : () => _sendDeviceCommand(
+                                type: "fish_feeder",
+                                durationMs: 4000,
+                              ),
+                      icon: const Icon(Icons.restaurant),
+                      label: const Text("Feed 4s"),
                     ),
                   ],
                 ),

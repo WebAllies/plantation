@@ -79,12 +79,12 @@ class _AiHarvestPredictionPageState extends State<AiHarvestPredictionPage> {
       reasons.add("Temperature missing/invalid");
     } else if (temp < tempMin) {
       score -= 10;
-      reasons.add("Water temperature low (${temp}°C) → growth slows down");
+      reasons.add("Water temperature low ($temp°C) → growth slows down");
     } else if (temp > tempMax) {
       score -= 10;
-      reasons.add("Water temperature high (${temp}°C) → oxygen may drop");
+      reasons.add("Water temperature high ($temp°C) → oxygen may drop");
     } else {
-      reasons.add("Temperature stable (${temp}°C) → healthy root zone");
+      reasons.add("Temperature stable ($temp°C) → healthy root zone");
     }
 
     // --- Water level scoring ---

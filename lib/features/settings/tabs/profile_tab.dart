@@ -44,8 +44,8 @@ class _ProfileTabState extends State<ProfileTab> {
 
   // Read-only work fields (from Firestore)
 
-  String _assignedZone = "—"; // warehouse/zone/site
-  String _accessLevel = "—"; // e.g., Read / Write / Full
+  final String _assignedZone = "—"; // warehouse/zone/site
+  final String _accessLevel = "—"; // e.g., Read / Write / Full
 
   // Security / audit info (from Firestore)
   DateTime? _lastLoginAt;

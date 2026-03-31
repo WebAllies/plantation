@@ -55,7 +55,10 @@ class _ControlPageState extends State<ControlPage> {
     };
 
     if (targetState != null) payload['targetState'] = targetState;
-    if (durationSec != null) payload['durationSec'] = durationSec;
+    if (durationSec != null) {
+      payload['durationSec'] = durationSec;
+      payload['durationMs'] = durationSec * 1000;
+    }
 
     await cmdRef.set(payload);
 
@@ -185,9 +188,14 @@ class _ControlPageState extends State<ControlPage> {
 
           final d = snap.data!.data() as Map<String, dynamic>;
 
-          // Existing fields (you already have)
-          final pumpState = (d['pumpState'] ?? false) as bool;
-          final valveState = (d['valveState'] ?? false) as bool;
+          final relayStates = (d['relayStates'] is Map<String, dynamic>)
+              ? (d['relayStates'] as Map<String, dynamic>)
+              : <String, dynamic>{};
+          final phUpState = relayStates['phUp'] == true;
+          final phDownState = relayStates['phDown'] == true;
+          final nutrientState = relayStates['nutrient'] == true;
+          final fishToFilterState = relayStates['fishToFilter'] == true;
+          final feederState = relayStates['fishFeeder'] == true;
 
           // New fields
           final controlMode = (d['controlMode'] ?? 'manual').toString(); // manual/auto
@@ -250,8 +258,8 @@ class _ControlPageState extends State<ControlPage> {
                 child: SwitchListTile(
                   title: const Text("Full Control Automation"),
                   subtitle: Text(isAuto
-                      ? "AUTO mode (ESP32 runs schedules & auto-fill)"
-                      : "MANUAL mode (you control pump/valves)"),
+                      ? "AUTO mode (Firebase drives relay commands)"
+                      : "MANUAL mode (you control relays)"),
                   value: isAuto,
                   onChanged: (v) => _setControlMode(
                     deviceId: deviceId,
@@ -311,35 +319,56 @@ class _ControlPageState extends State<ControlPage> {
                     ),
                     const Divider(height: 1),
 
-                    // Pump
                     SwitchListTile(
-                      title: const Text("Pump"),
-                      subtitle: Text(pumpState ? "ON" : "OFF"),
-                      value: pumpState,
+                      title: const Text("Fish Tank To Filter Bed"),
+                      subtitle: Text(fishToFilterState ? "ON" : "OFF"),
+                      value: fishToFilterState,
                       onChanged: isAuto
                           ? null
                           : (v) => _sendCommand(
                                 deviceId: deviceId,
-                                type: 'pump',
+                                type: 'fish_to_filter',
                                 targetState: v,
                               ),
                     ),
 
-                    // Feeding Valve (your current "valve" can be used as feeding valve)
                     SwitchListTile(
-                      title: const Text("Feeding Valve"),
-                      subtitle: Text(valveState ? "OPEN" : "CLOSED"),
-                      value: valveState,
+                      title: const Text("pH Up Relay"),
+                      subtitle: Text(phUpState ? "ON" : "OFF"),
+                      value: phUpState,
                       onChanged: isAuto
                           ? null
                           : (v) => _sendCommand(
                                 deviceId: deviceId,
-                                type: 'valve',
+                                type: 'ph_up',
+                                targetState: v,
+                              ),
+                    ),
+                    SwitchListTile(
+                      title: const Text("pH Down Relay"),
+                      subtitle: Text(phDownState ? "ON" : "OFF"),
+                      value: phDownState,
+                      onChanged: isAuto
+                          ? null
+                          : (v) => _sendCommand(
+                                deviceId: deviceId,
+                                type: 'ph_down',
+                                targetState: v,
+                              ),
+                    ),
+                    SwitchListTile(
+                      title: const Text("Nutrient Relay"),
+                      subtitle: Text(nutrientState ? "ON" : "OFF"),
+                      value: nutrientState,
+                      onChanged: isAuto
+                          ? null
+                          : (v) => _sendCommand(
+                                deviceId: deviceId,
+                                type: 'nutrient',
                                 targetState: v,
                               ),
                     ),
 
-                    // Feed now (works in both modes)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
                       child: SizedBox(
@@ -347,11 +376,15 @@ class _ControlPageState extends State<ControlPage> {
                         child: ElevatedButton.icon(
                           onPressed: () => _sendCommand(
                             deviceId: deviceId,
-                            type: 'feed',
+                            type: 'fish_feeder',
                             durationSec: _feedDurationSec,
                           ),
                           icon: const Icon(Icons.restaurant),
-                          label: Text("Feed now (${_feedDurationSec}s)"),
+                          label: Text(
+                            feederState
+                                ? "Feeder running..."
+                                : "Feed now (${_feedDurationSec}s)",
+                          ),
                         ),
                       ),
                     ),

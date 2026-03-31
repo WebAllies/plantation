@@ -26,8 +26,8 @@ class _TelemetryFrame {
   final String? sensorStatus;
   final bool? lastReadOk;
   final int? sampleCount;
-  final bool? pumpState;
-  final bool? valveState;
+  final Map<String, bool> relayStates;
+  final String? relaySummary;
   final int? rssi;
 
   const _TelemetryFrame({
@@ -43,8 +43,8 @@ class _TelemetryFrame {
     this.sensorStatus,
     this.lastReadOk,
     this.sampleCount,
-    this.pumpState,
-    this.valveState,
+    this.relayStates = const {},
+    this.relaySummary,
     this.rssi,
   });
 
@@ -78,8 +78,12 @@ class _TelemetryFrame {
           _toStringValue(json['sensorStatus']) ?? fallback?.sensorStatus,
       lastReadOk: _toBoolValue(json['lastReadOk']) ?? fallback?.lastReadOk,
       sampleCount: _toIntValue(json['sampleCount']) ?? fallback?.sampleCount,
-      pumpState: _toBoolValue(json['pumpState']) ?? fallback?.pumpState,
-      valveState: _toBoolValue(json['valveState']) ?? fallback?.valveState,
+      relayStates:
+          _toBoolMap(json['relayStates']) ??
+          fallback?.relayStates ??
+          const <String, bool>{},
+      relaySummary:
+          _toStringValue(json['relaySummary']) ?? fallback?.relaySummary,
       rssi: _toIntValue(json['rssi']) ?? fallback?.rssi,
     );
   }
@@ -120,8 +124,12 @@ class _TelemetryFrame {
           _toStringValue(data['sensorStatus']) ?? fallback?.sensorStatus,
       lastReadOk: _toBoolValue(data['lastReadOk']) ?? fallback?.lastReadOk,
       sampleCount: _toIntValue(data['sampleCount']) ?? fallback?.sampleCount,
-      pumpState: _toBoolValue(data['pumpState']) ?? fallback?.pumpState,
-      valveState: _toBoolValue(data['valveState']) ?? fallback?.valveState,
+      relayStates:
+          _toBoolMap(data['relayStates']) ??
+          fallback?.relayStates ??
+          const <String, bool>{},
+      relaySummary:
+          _toStringValue(data['relaySummary']) ?? fallback?.relaySummary,
       rssi: _toIntValue(data['rssi']) ?? fallback?.rssi,
     );
   }
@@ -154,6 +162,18 @@ class _TelemetryFrame {
       if (normalized == 'false' || normalized == '0') return false;
     }
     return null;
+  }
+
+  static Map<String, bool>? _toBoolMap(dynamic value) {
+    if (value is! Map) return null;
+    final out = <String, bool>{};
+    value.forEach((key, raw) {
+      final parsed = _toBoolValue(raw);
+      if (parsed != null) {
+        out[key.toString()] = parsed;
+      }
+    });
+    return out;
   }
 }
 
@@ -1107,12 +1127,16 @@ class _DashboardPageState extends State<DashboardPage> {
             );
             final activeFrame = _liveFrame ?? firestoreFrame;
 
-            final pumpOn = activeFrame.pumpState ?? false;
-            final valveOpen = activeFrame.valveState ?? false;
             final firestoreTs = data['lastSeen'];
             final firestoreSeen = firestoreTs is Timestamp
                 ? firestoreTs.toDate()
                 : null;
+            final relaySummary = activeFrame.relaySummary ??
+                (activeFrame.relayStates.isEmpty
+                    ? 'No relay state available'
+                    : activeFrame.relayStates.entries
+                        .map((e) => '${e.key}: ${e.value ? "ON" : "OFF"}')
+                        .join('\n'));
 
             final tempTrend = _trendLabel(
               activeFrame.temperatureC,
@@ -1151,6 +1175,12 @@ class _DashboardPageState extends State<DashboardPage> {
                       wsUrl: wsUrl,
                       mqttTopicLive: mqttTopicLive,
                     ),
+                  ),
+                  const SizedBox(height: 14),
+                  _infoCard(
+                    icon: Icons.power,
+                    title: 'Relay States',
+                    subtitle: relaySummary,
                   ),
                   const SizedBox(height: 18),
 

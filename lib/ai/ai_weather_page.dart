@@ -207,7 +207,7 @@ void _bindAutoMode() {
           title: "Reduce irrigation",
           detail:
               "Rain likely (${w.chanceOfRain.toStringAsFixed(0)}% / ${w.totalPrecipMm.toStringAsFixed(1)}mm). Reduce/stop irrigation.",
-          commandType: "valve",
+          commandType: "fish_to_filter",
           targetState: false,
         ),
       );
@@ -219,7 +219,7 @@ void _bindAutoMode() {
           title: "Increase water circulation",
           detail:
               "High temperature forecast (${w.maxTempC.toStringAsFixed(1)}°C). Increase pump circulation.",
-          commandType: "pump",
+          commandType: "fish_to_filter",
           targetState: true,
         ),
       );
@@ -610,7 +610,7 @@ class WeatherSnapshot {
         ? (days.first["day"] as Map?)?.cast<String, dynamic>() ?? {}
         : <String, dynamic>{};
 
-    double _toDouble(dynamic v) {
+    double toDouble(dynamic v) {
       if (v == null) return 0;
       if (v is num) return v.toDouble();
       return double.tryParse(v.toString()) ?? 0;
@@ -623,9 +623,9 @@ class WeatherSnapshot {
 
     return WeatherSnapshot(
       locationName: locationName.trim().isEmpty ? "Unknown" : locationName,
-      maxTempC: _toDouble(day0["maxtemp_c"]),
-      chanceOfRain: _toDouble(day0["daily_chance_of_rain"]),
-      totalPrecipMm: _toDouble(day0["totalprecip_mm"]),
+      maxTempC: toDouble(day0["maxtemp_c"]),
+      chanceOfRain: toDouble(day0["daily_chance_of_rain"]),
+      totalPrecipMm: toDouble(day0["totalprecip_mm"]),
       updatedAt: DateTime.tryParse((loc["localtime"] ?? "").toString()),
     );
   }

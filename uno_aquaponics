@@ -1,10 +1,10 @@
 #include <Arduino.h>
 
-// Analog channels on the Uno
-const int PH_PIN = A0;
+// Analog channels on the Arduino Nano
+const int PH_PIN = A2;
 const int TDS_PIN = A1;
 
-// Ultrasonic sensors on the Uno
+// Ultrasonic sensors on the Arduino Nano
 const int FISH_TANK_TRIG_PIN = 2;
 const int FISH_TANK_ECHO_PIN = 3;
 const int PH_UP_TRIG_PIN = 4;
@@ -18,6 +18,7 @@ const int NUTRIENT_ECHO_PIN = 9;
 const size_t ANALOG_SAMPLE_COUNT = 15;
 const unsigned long PUBLISH_INTERVAL_MS = 1000;
 const unsigned long ULTRASONIC_TIMEOUT_US = 30000;
+const unsigned long SERIAL_BAUD = 115200;
 const float ADC_REFERENCE_VOLTAGE = 5.0f;
 const float ADC_MAX_READING = 1023.0f;
 
@@ -150,7 +151,7 @@ void printMonitorMetric(const char *label, float value, const char *unit) {
 }
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(SERIAL_BAUD);
   pinMode(FISH_TANK_TRIG_PIN, OUTPUT);
   pinMode(FISH_TANK_ECHO_PIN, INPUT);
   pinMode(PH_UP_TRIG_PIN, OUTPUT);

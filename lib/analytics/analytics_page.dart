@@ -839,7 +839,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                                       physics:
                                           const NeverScrollableScrollPhysics(),
                                       itemCount: alertDocs.length,
-                                      separatorBuilder: (_, __) =>
+                                      separatorBuilder: (_, _) =>
                                           const Divider(height: 1),
                                       itemBuilder: (context, i) {
                                         final data = alertDocs[i].data();

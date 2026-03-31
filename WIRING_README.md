@@ -3,17 +3,17 @@
 This document describes the current hardware wiring for the `uno_aquaponics` and `esp32_aquaponics` sketches in this repo.
 
 Current architecture:
-- Arduino Uno handles all analog and ultrasonic sensors
+- Arduino Nano handles all analog and ultrasonic sensors
 - ESP32 handles DS18B20 temperature, Wi-Fi, MQTT, Firebase, and app/backend telemetry
-- Uno sends sensor values to the ESP32 over UART
+- Nano sends sensor values to the ESP32 over UART
 
 ## Firmware Upload
-- Upload [uno_aquaponics](/mnt/e/shuaib/plantation/uno_aquaponics) to the Arduino Uno
+- Upload [uno_aquaponics](/mnt/e/shuaib/plantation/uno_aquaponics) to the Arduino Nano
 - Upload [esp32_aquaponics](/mnt/e/shuaib/plantation/esp32_aquaponics) to the ESP32
 
 ## Board Roles
-### Arduino Uno
-- Reads pH sensor on `A0`
+### Arduino Nano
+- Reads pH sensor on `A2`
 - Reads TDS sensor on `A1`
 - Reads 4 ultrasonic tank level sensors on digital pins
 - Sends serial messages to the ESP32:
@@ -26,43 +26,44 @@ Current architecture:
 
 ### ESP32
 - Reads DS18B20 water temperature on `GPIO 4`
-- Receives Uno serial data on `GPIO 16`
+- Receives Nano serial data on `GPIO 16`
+- Drives 5 relays on GPIO outputs
 - Publishes telemetry to MQTT and Firebase
 
-## Arduino Uno Wiring
+## Arduino Nano Wiring
 ### pH Sensor Module
-- `AO` -> Uno `A0`
-- `VCC` -> Uno `5V` or the module's rated supply
-- `GND` -> Uno `GND`
+- `AO` -> Nano `A2`
+- `VCC` -> Nano `5V` or the module's rated supply
+- `GND` -> Nano `GND`
 
 ### TDS Sensor Module
-- `AO` -> Uno `A1`
-- `VCC` -> Uno `5V` or the module's rated supply
-- `GND` -> Uno `GND`
+- `AO` -> Nano `A1`
+- `VCC` -> Nano `5V` or the module's rated supply
+- `GND` -> Nano `GND`
 
 ### Fish Tank Ultrasonic Sensor
-- `TRIG` -> Uno `D2`
-- `ECHO` -> Uno `D3`
-- `VCC` -> Uno `5V`
-- `GND` -> Uno `GND`
+- `TRIG` -> Nano `D2`
+- `ECHO` -> Nano `D3`
+- `VCC` -> Nano `5V`
+- `GND` -> Nano `GND`
 
 ### pH Up Tank Ultrasonic Sensor
-- `TRIG` -> Uno `D4`
-- `ECHO` -> Uno `D5`
-- `VCC` -> Uno `5V`
-- `GND` -> Uno `GND`
+- `TRIG` -> Nano `D4`
+- `ECHO` -> Nano `D5`
+- `VCC` -> Nano `5V`
+- `GND` -> Nano `GND`
 
 ### pH Down Tank Ultrasonic Sensor
-- `TRIG` -> Uno `D6`
-- `ECHO` -> Uno `D7`
-- `VCC` -> Uno `5V`
-- `GND` -> Uno `GND`
+- `TRIG` -> Nano `D6`
+- `ECHO` -> Nano `D7`
+- `VCC` -> Nano `5V`
+- `GND` -> Nano `GND`
 
 ### Nutrient Tank Ultrasonic Sensor
-- `TRIG` -> Uno `D8`
-- `ECHO` -> Uno `D9`
-- `VCC` -> Uno `5V`
-- `GND` -> Uno `GND`
+- `TRIG` -> Nano `D8`
+- `ECHO` -> Nano `D9`
+- `VCC` -> Nano `5V`
+- `GND` -> Nano `GND`
 
 ## ESP32 Wiring
 ### DS18B20 Water Temperature Sensor
@@ -71,14 +72,27 @@ Current architecture:
 - `GND` -> ESP32 `GND`
 - Add a `4.7k` resistor between `DATA` and `3.3V`
 
-### Uno To ESP32 UART
-- Uno `TX` -> ESP32 `GPIO 16` through a voltage divider or logic level shifter
-- Uno `GND` -> ESP32 `GND`
-- Optional: ESP32 `GPIO 17` -> Uno `RX` if you later want 2-way serial
+### Nano To ESP32 UART
+- Nano `TX` -> ESP32 `GPIO 16` through a voltage divider or logic level shifter
+- Nano `GND` -> ESP32 `GND`
+- Optional: ESP32 `GPIO 17` -> Nano `RX` if you later want 2-way serial
+
+### ESP32 Relay Outputs
+- `GPIO 18` -> pH Up relay input
+- `GPIO 19` -> pH Down relay input
+- `GPIO 21` -> nutrient relay input
+- `GPIO 22` -> fish tank to filter bed relay input
+- `GPIO 23` -> fish feeder relay input
+- relay module `GND` -> ESP32 `GND`
+- relay module `VCC` -> module-rated supply
+
+Note:
+- current firmware assumes active-high relay control
+- if your relay board is active-low, firmware constants must be adjusted
 
 ## Required Common Ground
 All grounds must be connected together:
-- Uno `GND`
+- Nano `GND`
 - ESP32 `GND`
 - pH sensor `GND`
 - TDS sensor `GND`
@@ -88,10 +102,10 @@ All grounds must be connected together:
 Without common ground, UART and sensor readings will not be reliable.
 
 ## Important Voltage Note
-Do not connect Uno `TX` directly to ESP32 `GPIO 16`.
+Do not connect Nano `TX` directly to ESP32 `GPIO 16`.
 
 Why:
-- Uno serial output is `5V`
+- Nano serial output is `5V`
 - ESP32 GPIO is `3.3V` only
 
 Use one of these:
@@ -99,11 +113,11 @@ Use one of these:
 - resistor divider
 
 Simple resistor divider example:
-- Uno `TX` -> `1k resistor` -> junction -> ESP32 `GPIO 16`
+- Nano `TX` -> `1k resistor` -> junction -> ESP32 `GPIO 16`
 - junction -> `2k resistor` -> `GND`
 
-## Serial Monitor Output On The Uno
-The Uno sketch prints both machine-readable lines and human-readable monitor lines.
+## Serial Monitor Output On The Nano
+The Nano sketch prints both machine-readable lines and human-readable monitor lines.
 
 Examples:
 
@@ -128,13 +142,13 @@ MON:Nutrient distance = 16.50 cm
 MON:------------------------------
 ```
 
-Use Uno Serial Monitor at:
-- `9600 baud`
+Use Nano Serial Monitor at:
+- `115200 baud`
 
 ## Calibration Notes
 The current sketches use placeholder calibration constants. These must be tuned on your real hardware.
 
-### Uno pH/TDS
+### Nano pH/TDS
 Check and tune in [uno_aquaponics](/mnt/e/shuaib/plantation/uno_aquaponics):
 - `PH_SLOPE`
 - `PH_OFFSET`
@@ -156,7 +170,7 @@ Meaning:
 - `FULL_DISTANCE_CM` = water is closer to the sensor
 
 ## Libraries Needed
-### Uno
+### Nano
 - No extra libraries required for the current `uno_aquaponics` sketch
 
 ### ESP32
@@ -167,9 +181,9 @@ Meaning:
 - `DallasTemperature`
 
 ## Troubleshooting
-### Uno upload says port access denied
+### Nano upload says port access denied
 - Close Serial Monitor
-- Close any serial terminal using the Uno COM port
+- Close any serial terminal using the Nano COM port
 - Replug the board
 - Re-select the COM port
 
@@ -177,8 +191,8 @@ Meaning:
 - Install the `OneWire` library in Arduino IDE
 
 ### ESP32 receives no pH/TDS/level data
-- Check Uno is powered and running
-- Check Uno `TX` to ESP32 `GPIO 16`
+- Check Nano is powered and running
+- Check Nano `TX` to ESP32 `GPIO 16`
 - Check shared ground
-- Check baud rate is `9600`
-- Check level shifting from Uno `TX` to ESP32 `RX`
+- Check baud rate is `115200`
+- Check level shifting from Nano `TX` to ESP32 `RX`

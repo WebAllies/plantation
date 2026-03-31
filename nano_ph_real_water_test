@@ -1,0 +1,117 @@
+#include <Arduino.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+const int PH_PIN = A2;
+const unsigned long SERIAL_BAUD = 9600;
+const unsigned long SAMPLE_DELAY_MS = 30;
+const unsigned long READ_INTERVAL_MS = 1000;
+const unsigned long DISPLAY_INTERVAL_MS = 500;
+const float ADC_REFERENCE_VOLTAGE = 5.0f;
+const float ADC_MAX_READING = 1024.0f;
+const float PH_SLOPE = -5.70f;
+const float CALIBRATION_VALUE = 21.34f - 0.70f;
+
+const int SCREEN_WIDTH = 128;
+const int SCREEN_HEIGHT = 64;
+const int OLED_RESET = -1;
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+int phBuffer[10];
+float phVoltage = 0.0f;
+float phValue = 0.0f;
+unsigned long lastReadMs = 0;
+unsigned long lastDisplayMs = 0;
+
+void sortBuffer(int *values, size_t length) {
+  for (size_t i = 0; i < length; i++) {
+    for (size_t j = i + 1; j < length; j++) {
+      if (values[j] < values[i]) {
+        int temp = values[i];
+        values[i] = values[j];
+        values[j] = temp;
+      }
+    }
+  }
+}
+
+void readPhSensor() {
+  for (int i = 0; i < 10; i++) {
+    phBuffer[i] = analogRead(PH_PIN);
+    delay(SAMPLE_DELAY_MS);
+  }
+
+  sortBuffer(phBuffer, 10);
+
+  unsigned long avgRaw = 0;
+  for (int i = 2; i < 8; i++) {
+    avgRaw += phBuffer[i];
+  }
+
+  phVoltage = ((float)avgRaw * ADC_REFERENCE_VOLTAGE) / ADC_MAX_READING / 6.0f;
+  phValue = (PH_SLOPE * phVoltage) + CALIBRATION_VALUE;
+
+  Serial.print("Voltage: ");
+  Serial.print(phVoltage, 3);
+  Serial.print(" V  pH: ");
+  Serial.println(phValue, 2);
+}
+
+void drawDisplay() {
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setTextColor(SSD1306_WHITE);
+
+  display.setCursor(0, 0);
+  display.print("pH:");
+
+  display.setCursor(42, 0);
+  display.print(phValue, 2);
+
+  display.setTextSize(1);
+  display.setCursor(0, 32);
+  display.print("Voltage: ");
+  display.print(phVoltage, 3);
+  display.print(" V");
+
+  display.setCursor(0, 48);
+  display.print("Pin A2 real water test");
+
+  display.display();
+}
+
+void setup() {
+  pinMode(PH_PIN, INPUT);
+  Serial.begin(SERIAL_BAUD);
+  Wire.begin();
+
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println("OLED init failed");
+    while (true) {
+      delay(100);
+    }
+  }
+
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+  display.setTextSize(1);
+  display.setCursor(0, 0);
+  display.println("pH real water test");
+  display.println("Reading sensor...");
+  display.display();
+}
+
+void loop() {
+  unsigned long now = millis();
+
+  if (now - lastReadMs >= READ_INTERVAL_MS) {
+    lastReadMs = now;
+    readPhSensor();
+  }
+
+  if (now - lastDisplayMs >= DISPLAY_INTERVAL_MS) {
+    lastDisplayMs = now;
+    drawDisplay();
+  }
+}

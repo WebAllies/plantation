@@ -6,6 +6,7 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <math.h>
+#include <stdlib.h>
 #include <time.h>
 
 #include "addons/TokenHelper.h"
@@ -34,12 +35,18 @@ const uint16_t WS_PORT = 81;
 
 // -------------------- GPIO --------------------
 const int TEMP_ONEWIRE_PIN = 4;
+const int RELAY_PH_UP_PIN = 18;
+const int RELAY_PH_DOWN_PIN = 19;
+const int RELAY_NUTRIENT_PIN = 21;
+const int RELAY_FISH_TO_FILTER_PIN = 22;
+const int RELAY_FISH_FEEDER_PIN = 23;
+const bool RELAY_ACTIVE_HIGH = true;
 
-// UART from optional Arduino Uno. Protect ESP32 RX from 5V Uno TX with a level shifter/divider.
+// UART from optional Arduino Nano. Protect ESP32 RX from 5V Nano TX with a level shifter/divider.
 const bool USE_UNO_UART = true;
 const int UNO_UART_RX_PIN = 16;
 const int UNO_UART_TX_PIN = 17;
-const uint32_t UNO_UART_BAUD = 9600;
+const uint32_t UNO_UART_BAUD = 115200;
 const unsigned long UNO_DATA_TIMEOUT_MS = 15000;
 
 // Sensor and sampling settings
@@ -73,6 +80,11 @@ float nutrientTankLevelPct = 100.0f;
 bool lastReadOk = true;
 uint32_t sampleCount = 0;
 String sensorStatus = "booting";
+bool relayPhUpState = false;
+bool relayPhDownState = false;
+bool relayNutrientState = false;
+bool relayFishToFilterState = false;
+bool relayFishFeederState = false;
 
 String wsUrl = "";
 String mqttTopicLive = "";
@@ -94,6 +106,10 @@ unsigned long lastStatusMs = 0;
 unsigned long lastCmdPollMs = 0;
 unsigned long lastHistoryMs = 0;
 unsigned long lastMqttReconnectAttemptMs = 0;
+bool feederPulseActive = false;
+unsigned long feederPulseEndMs = 0;
+String feederPulseCommandPath = "";
+unsigned long feederPulseDurationMs = 0;
 
 struct UnoTelemetry {
   bool hasPh = false;
@@ -203,6 +219,71 @@ float round2(float value) {
   return roundf(value * 100.0f) / 100.0f;
 }
 
+bool parseStrictFloat(const String &raw, float &outValue) {
+  if (raw.length() == 0) return false;
+
+  char buffer[32];
+  size_t copyLen = raw.length();
+  if (copyLen >= sizeof(buffer)) copyLen = sizeof(buffer) - 1;
+  raw.substring(0, copyLen).toCharArray(buffer, copyLen + 1);
+
+  char *endPtr = nullptr;
+  float parsed = strtof(buffer, &endPtr);
+  if (endPtr == buffer || *endPtr != '\0' || !isfinite(parsed)) {
+    return false;
+  }
+
+  outValue = parsed;
+  return true;
+}
+
+void setRelayOutputPin(int pin, bool state) {
+  int level = state ? (RELAY_ACTIVE_HIGH ? HIGH : LOW) : (RELAY_ACTIVE_HIGH ? LOW : HIGH);
+  digitalWrite(pin, level);
+}
+
+bool *relayStatePtr(const String &type) {
+  if (type == "ph_up") return &relayPhUpState;
+  if (type == "ph_down") return &relayPhDownState;
+  if (type == "nutrient") return &relayNutrientState;
+  if (type == "fish_to_filter") return &relayFishToFilterState;
+  if (type == "fish_feeder") return &relayFishFeederState;
+  return nullptr;
+}
+
+int relayPinForType(const String &type) {
+  if (type == "ph_up") return RELAY_PH_UP_PIN;
+  if (type == "ph_down") return RELAY_PH_DOWN_PIN;
+  if (type == "nutrient") return RELAY_NUTRIENT_PIN;
+  if (type == "fish_to_filter") return RELAY_FISH_TO_FILTER_PIN;
+  if (type == "fish_feeder") return RELAY_FISH_FEEDER_PIN;
+  return -1;
+}
+
+bool isLatchedRelayType(const String &type) {
+  return type == "ph_up" ||
+         type == "ph_down" ||
+         type == "nutrient" ||
+         type == "fish_to_filter";
+}
+
+String relayStateSummary() {
+  return String("ph_up=") + (relayPhUpState ? "on" : "off") +
+         ",ph_down=" + (relayPhDownState ? "on" : "off") +
+         ",nutrient=" + (relayNutrientState ? "on" : "off") +
+         ",fish_to_filter=" + (relayFishToFilterState ? "on" : "off") +
+         ",fish_feeder=" + (relayFishFeederState ? "on" : "off");
+}
+
+void applyRelayState(const String &type, bool state) {
+  bool *statePtr = relayStatePtr(type);
+  int pin = relayPinForType(type);
+  if (statePtr == nullptr || pin < 0) return;
+
+  *statePtr = state;
+  setRelayOutputPin(pin, state);
+}
+
 String epochMillisString() {
   time_t now = time(nullptr);
   if (now < 1700000000) {
@@ -267,8 +348,8 @@ void parseUnoLine(const String &line) {
 
   if (rawValue.length() == 0) return;
 
-  float value = rawValue.toFloat();
-  if (!isfinite(value)) return;
+  float value = NAN;
+  if (!parseStrictFloat(rawValue, value)) return;
 
   if (key == "PH") {
     unoTelemetry.phValue = value;
@@ -392,6 +473,12 @@ String buildSnapshotJson() {
   js.set("sensorStatus", sensorStatus);
   js.set("lastReadOk", lastReadOk);
   js.set("sampleCount", (int)sampleCount);
+  js.set("relayStates/phUp", relayPhUpState);
+  js.set("relayStates/phDown", relayPhDownState);
+  js.set("relayStates/nutrient", relayNutrientState);
+  js.set("relayStates/fishToFilter", relayFishToFilterState);
+  js.set("relayStates/fishFeeder", relayFishFeederState);
+  js.set("relaySummary", relayStateSummary());
   js.set("rssi", WiFi.RSSI());
 
   String out;
@@ -493,6 +580,18 @@ void setDeviceFields(FirebaseJson &content) {
   content.set("fields/sensorStatus/stringValue", sensorStatus);
   content.set("fields/lastReadOk/booleanValue", lastReadOk);
   content.set("fields/sampleCount/integerValue", String(sampleCount));
+  content.set("fields/relayStates/mapValue/fields/phUp/booleanValue", relayPhUpState);
+  content.set("fields/relayStates/mapValue/fields/phDown/booleanValue", relayPhDownState);
+  content.set("fields/relayStates/mapValue/fields/nutrient/booleanValue", relayNutrientState);
+  content.set(
+    "fields/relayStates/mapValue/fields/fishToFilter/booleanValue",
+    relayFishToFilterState
+  );
+  content.set(
+    "fields/relayStates/mapValue/fields/fishFeeder/booleanValue",
+    relayFishFeederState
+  );
+  content.set("fields/relaySummary/stringValue", relayStateSummary());
   content.set("fields/wsUrl/stringValue", wsUrl);
   content.set("fields/realtimeTransport/stringValue", "mqtt");
   content.set("fields/mqttTopicLive/stringValue", mqttTopicLive);
@@ -513,7 +612,7 @@ void updateDeviceStatus(bool online) {
     "",
     deviceDocPath().c_str(),
     content.raw(),
-    "name,online,lastSeen,rssi,temperatureC,ph,waterLevelPct,tdsPpm,phUpTankLevelPct,phDownTankLevelPct,nutrientTankLevelPct,sensorStatus,lastReadOk,sampleCount,wsUrl,realtimeTransport,mqttTopicLive,mqttStatusTopic,mqttEnabled,simulator"
+    "name,online,lastSeen,rssi,temperatureC,ph,waterLevelPct,tdsPpm,phUpTankLevelPct,phDownTankLevelPct,nutrientTankLevelPct,sensorStatus,lastReadOk,sampleCount,relayStates,relaySummary,wsUrl,realtimeTransport,mqttTopicLive,mqttStatusTopic,mqttEnabled,simulator"
   );
   printFirestoreResult("updateDeviceStatus", patchOk);
 }
@@ -531,6 +630,18 @@ void writeReadingSnapshot() {
   content.set("fields/sensorStatus/stringValue", sensorStatus);
   content.set("fields/lastReadOk/booleanValue", lastReadOk);
   content.set("fields/sampleCount/integerValue", String(sampleCount));
+  content.set("fields/relayStates/mapValue/fields/phUp/booleanValue", relayPhUpState);
+  content.set("fields/relayStates/mapValue/fields/phDown/booleanValue", relayPhDownState);
+  content.set("fields/relayStates/mapValue/fields/nutrient/booleanValue", relayNutrientState);
+  content.set(
+    "fields/relayStates/mapValue/fields/fishToFilter/booleanValue",
+    relayFishToFilterState
+  );
+  content.set(
+    "fields/relayStates/mapValue/fields/fishFeeder/booleanValue",
+    relayFishFeederState
+  );
+  content.set("fields/relaySummary/stringValue", relayStateSummary());
   content.set("fields/rssi/integerValue", String(WiFi.RSSI()));
 
   bool ok = Firebase.Firestore.createDocument(
@@ -576,31 +687,17 @@ bool ensureDeviceDocument() {
   return false;
 }
 
-void executeCommand(const String &docFullName, const String &type, bool targetState) {
-  int idx = docFullName.indexOf("/documents/");
-  if (idx < 0) return;
-  String docPath = docFullName.substring(idx + 11);
-
-  Serial.printf(
-    "Executing command: %s -> %s\n",
-    type.c_str(),
-    targetState ? "true" : "false"
-  );
-
-  (void) targetState;
-  bool ok = false;
-  String msg = "Actuator commands are disabled until relay wiring is defined";
-  logEvent("warn", "command_ignored", "Ignored command type while actuators are disabled: " + type);
-
-  updateDeviceStatus(true);
-  broadcastSnapshot();
-  publishMqttSnapshot();
-
+bool patchCommandStatus(
+  const String &docPath,
+  const String &status,
+  const String &message,
+  bool includeExecutedAt
+) {
   FirebaseJson patch;
-  patch.set("fields/status/stringValue", ok ? "executed" : "failed");
-  patch.set("fields/message/stringValue", msg);
+  patch.set("fields/status/stringValue", status);
+  patch.set("fields/message/stringValue", message);
   String updateMask = "status,message";
-  if (setTimestampField(patch, "fields/executedAt/timestampValue")) {
+  if (includeExecutedAt && setTimestampField(patch, "fields/executedAt/timestampValue")) {
     updateMask = "status,message,executedAt";
   }
 
@@ -612,7 +709,109 @@ void executeCommand(const String &docFullName, const String &type, bool targetSt
     patch.raw(),
     updateMask.c_str()
   );
-  printFirestoreResult("executeCommand patch", patchOk);
+  printFirestoreResult("patchCommandStatus", patchOk);
+  return patchOk;
+}
+
+void finalizeFeederPulse() {
+  if (!feederPulseActive) return;
+
+  feederPulseActive = false;
+  feederPulseEndMs = 0;
+  applyRelayState("fish_feeder", false);
+  logEvent("info", "relay_pulse_completed", "fish_feeder pulse completed");
+  updateDeviceStatus(true);
+  broadcastSnapshot();
+  publishMqttSnapshot();
+
+  if (feederPulseCommandPath.length() > 0) {
+    patchCommandStatus(
+      feederPulseCommandPath,
+      "executed",
+      String("fish_feeder pulse completed after ") + String(feederPulseDurationMs) + " ms",
+      true
+    );
+  }
+
+  feederPulseCommandPath = "";
+  feederPulseDurationMs = 0;
+}
+
+void executeCommand(
+  const String &docFullName,
+  const String &type,
+  bool hasTargetState,
+  bool targetState,
+  bool hasDurationMs,
+  unsigned long durationMs
+) {
+  int idx = docFullName.indexOf("/documents/");
+  if (idx < 0) return;
+  String docPath = docFullName.substring(idx + 11);
+
+  Serial.printf(
+    "Executing command: %s -> %s\n",
+    type.c_str(),
+    hasTargetState ? (targetState ? "true" : "false") : "n/a"
+  );
+
+  bool ok = false;
+  String msg = "Unsupported command";
+
+  if (isLatchedRelayType(type)) {
+    if (!hasTargetState) {
+      msg = "targetState is required";
+      logEvent("warn", "command_failed", type + " missing targetState");
+    } else {
+      bool *statePtr = relayStatePtr(type);
+      if (statePtr != nullptr && *statePtr == targetState) {
+        msg = "Relay already in requested state";
+        logEvent("info", "command_executed", type + " already in requested state");
+      } else {
+        applyRelayState(type, targetState);
+        msg = String(type) + (targetState ? " turned ON" : " turned OFF");
+        logEvent("info", "command_executed", msg);
+      }
+      ok = true;
+    }
+  } else if (type == "fish_feeder") {
+    if (!hasDurationMs || durationMs == 0) {
+      msg = "durationMs is required for fish_feeder";
+      logEvent("warn", "command_failed", "fish_feeder missing durationMs");
+    } else if (feederPulseActive) {
+      msg = "fish_feeder pulse already active";
+       logEvent("warn", "command_failed", msg);
+    } else {
+      applyRelayState("fish_feeder", true);
+      feederPulseActive = true;
+      feederPulseDurationMs = durationMs;
+      feederPulseEndMs = millis() + durationMs;
+      feederPulseCommandPath = docPath;
+      logEvent(
+        "info",
+        "relay_pulse_started",
+        String("fish_feeder pulse started for ") + String(durationMs) + " ms"
+      );
+      updateDeviceStatus(true);
+      broadcastSnapshot();
+      publishMqttSnapshot();
+      patchCommandStatus(
+        docPath,
+        "executing",
+        String("fish_feeder pulse running for ") + String(durationMs) + " ms",
+        false
+      );
+      return;
+    }
+  } else {
+    msg = "Unknown command type";
+    logEvent("warn", "command_failed", "Unknown command type: " + type);
+  }
+
+  updateDeviceStatus(true);
+  broadcastSnapshot();
+  publishMqttSnapshot();
+  patchCommandStatus(docPath, ok ? "executed" : "failed", msg, true);
 }
 
 void pollLatestPendingCommand() {
@@ -642,6 +841,14 @@ void pollLatestPendingCommand() {
 
   FirebaseJsonArray docs;
   docs.setJsonArrayData(arr.stringValue);
+  String selectedDocName = "";
+  String selectedDocType = "";
+  bool selectedHasTargetState = false;
+  bool selectedTargetState = false;
+  bool selectedHasDurationMs = false;
+  unsigned long selectedDurationMs = 0;
+  String selectedSortKey = "";
+
   for (size_t i = 0; i < docs.size(); i++) {
     FirebaseJsonData docData;
     docs.get(docData, i);
@@ -654,21 +861,84 @@ void pollLatestPendingCommand() {
     FirebaseJsonData statusData;
     FirebaseJsonData typeData;
     FirebaseJsonData targetData;
+    FirebaseJsonData durationMsData;
+    FirebaseJsonData durationMsDoubleData;
+    FirebaseJsonData durationSecData;
+    FirebaseJsonData durationSecDoubleData;
+    FirebaseJsonData createdAtData;
+    FirebaseJsonData createTimeData;
 
     docJson.get(nameData, "name");
     docJson.get(statusData, "fields/status/stringValue");
     docJson.get(typeData, "fields/type/stringValue");
     docJson.get(targetData, "fields/targetState/booleanValue");
+    docJson.get(durationMsData, "fields/durationMs/integerValue");
+    docJson.get(durationMsDoubleData, "fields/durationMs/doubleValue");
+    docJson.get(durationSecData, "fields/durationSec/integerValue");
+    docJson.get(durationSecDoubleData, "fields/durationSec/doubleValue");
+    docJson.get(createdAtData, "fields/createdAt/timestampValue");
+    docJson.get(createTimeData, "createTime");
 
-    if (!nameData.success || !statusData.success || !typeData.success || !targetData.success) {
+    if (!nameData.success || !statusData.success || !typeData.success) {
       continue;
     }
 
     if (statusData.stringValue == "pending") {
-      executeCommand(nameData.stringValue, typeData.stringValue, targetData.boolValue);
-      return;
+      bool hasTargetState = targetData.success;
+      bool parsedTargetState = targetData.success ? targetData.boolValue : false;
+      bool hasDurationMs = false;
+      unsigned long durationMs = 0;
+
+      if (durationMsData.success) {
+        durationMs = (unsigned long)strtoull(durationMsData.stringValue.c_str(), nullptr, 10);
+        hasDurationMs = durationMs > 0;
+      } else if (durationMsDoubleData.success) {
+        durationMs = (unsigned long)durationMsDoubleData.doubleValue;
+        hasDurationMs = durationMs > 0;
+      } else if (durationSecData.success) {
+        durationMs = (unsigned long)strtoull(durationSecData.stringValue.c_str(), nullptr, 10) * 1000UL;
+        hasDurationMs = durationMs > 0;
+      } else if (durationSecDoubleData.success) {
+        durationMs = (unsigned long)(durationSecDoubleData.doubleValue * 1000.0);
+        hasDurationMs = durationMs > 0;
+      }
+
+      String sortKey = createdAtData.success ? createdAtData.stringValue : "";
+      if (sortKey.length() == 0 && createTimeData.success) {
+        sortKey = createTimeData.stringValue;
+      }
+      if (sortKey.length() == 0) {
+        sortKey = nameData.stringValue;
+      }
+
+      if (selectedDocName.length() == 0 || sortKey > selectedSortKey) {
+        selectedDocName = nameData.stringValue;
+        selectedDocType = typeData.stringValue;
+        selectedHasTargetState = hasTargetState;
+        selectedTargetState = parsedTargetState;
+        selectedHasDurationMs = hasDurationMs;
+        selectedDurationMs = durationMs;
+        selectedSortKey = sortKey;
+      }
     }
   }
+
+  if (selectedDocName.length() == 0) return;
+
+  executeCommand(
+    selectedDocName,
+    selectedDocType,
+    selectedHasTargetState,
+    selectedTargetState,
+    selectedHasDurationMs,
+    selectedDurationMs
+  );
+}
+
+void processFeederPulse() {
+  if (!feederPulseActive) return;
+  if ((long)(millis() - feederPulseEndMs) < 0) return;
+  finalizeFeederPulse();
 }
 
 void onWsEvent(uint8_t clientNum, WStype_t type, uint8_t *payload, size_t length) {
@@ -683,6 +953,17 @@ void onWsEvent(uint8_t clientNum, WStype_t type, uint8_t *payload, size_t length
 
 void setup() {
   Serial.begin(115200);
+
+  pinMode(RELAY_PH_UP_PIN, OUTPUT);
+  pinMode(RELAY_PH_DOWN_PIN, OUTPUT);
+  pinMode(RELAY_NUTRIENT_PIN, OUTPUT);
+  pinMode(RELAY_FISH_TO_FILTER_PIN, OUTPUT);
+  pinMode(RELAY_FISH_FEEDER_PIN, OUTPUT);
+  applyRelayState("ph_up", false);
+  applyRelayState("ph_down", false);
+  applyRelayState("nutrient", false);
+  applyRelayState("fish_to_filter", false);
+  applyRelayState("fish_feeder", false);
 
   if (USE_UNO_UART) {
     unoSerial.begin(UNO_UART_BAUD, SERIAL_8N1, UNO_UART_RX_PIN, UNO_UART_TX_PIN);
@@ -752,6 +1033,7 @@ void loop() {
   wsServer.loop();
   ensureMqttConnected();
   mqttClient.loop();
+  processFeederPulse();
 
   if (millis() - lastSensorMs >= SENSOR_INTERVAL_MS) {
     lastSensorMs = millis();

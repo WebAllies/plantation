@@ -27,6 +27,7 @@ const TOKEN_TTL_SECONDS = 15 * 60;
 const ALERT_RETENTION_DAYS = 3;
 const ALERT_CLEANUP_BATCH_SIZE = 300;
 const DEVICE_RECOMPUTE_BATCH_SIZE = 200;
+const FEEDER_SCAN_BATCH_SIZE = 200;
 
 const AUTOMATION_USER_UID = 'system_automation';
 const AUTOMATION_USER_EMAIL = 'automation@system.local';
@@ -368,10 +369,9 @@ function metricValueForAlert(metric, readings) {
   }
 }
 
-function commandPayload(targetState, reason) {
-  return {
-    type: 'pump',
-    targetState,
+function relayCommandPayload(type, targetState, reason, extra = {}) {
+  const payload = {
+    type,
     status: 'pending',
     requestedBy: AUTOMATION_USER_UID,
     requestedByEmail: AUTOMATION_USER_EMAIL,
@@ -380,6 +380,10 @@ function commandPayload(targetState, reason) {
     message: '',
     reason,
   };
+  if (typeof targetState === 'boolean') {
+    payload.targetState = targetState;
+  }
+  return { ...payload, ...extra };
 }
 
 function asDate(value) {
@@ -387,6 +391,68 @@ function asDate(value) {
   if (value instanceof Date) return value;
   if (typeof value.toDate === 'function') return value.toDate();
   return null;
+}
+
+function asString(value, fallback = '') {
+  if (value == null) return fallback;
+  return String(value);
+}
+
+function readRelayStates(data) {
+  const states = asMap(data.relayStates);
+  return {
+    phUp: asBool(states.phUp, false),
+    phDown: asBool(states.phDown, false),
+    nutrient: asBool(states.nutrient, false),
+    fishToFilter: asBool(states.fishToFilter, false),
+    fishFeeder: asBool(states.fishFeeder, false),
+  };
+}
+
+function hasRecentActiveCommand(commandDocs, type, targetState) {
+  return commandDocs.some((doc) => {
+    const data = doc.data() || {};
+    const sameType = asString(data.type) === type;
+    const sameTarget = typeof targetState !== 'boolean' || data.targetState === targetState;
+    const status = asString(data.status);
+    return sameType && sameTarget && (status === 'pending' || status === 'executing');
+  });
+}
+
+function relayTimeParts(date, timeZone) {
+  let formatter;
+  try {
+    formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  } catch (_) {
+    formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Etc/UTC',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  }
+
+  const parts = formatter.formatToParts(date);
+  const map = {};
+  for (const part of parts) {
+    map[part.type] = part.value;
+  }
+
+  return {
+    dateKey: `${map.year}-${map.month}-${map.day}`,
+    timeKey: `${map.hour}:${map.minute}`,
+  };
 }
 
 async function assertUserCanAccessDevice(uid, deviceId) {
@@ -516,6 +582,7 @@ async function evaluateAndPersistDeviceAlerts(deviceId, { deviceData } = {}) {
   }
 
   const readings = readTelemetry(data);
+  const relayStates = readRelayStates(data);
   if (
     readings.temperatureC == null &&
     readings.ph == null &&
@@ -525,11 +592,12 @@ async function evaluateAndPersistDeviceAlerts(deviceId, { deviceData } = {}) {
     return { status: 'no_telemetry' };
   }
 
-  const [globalSnap, overrideSnap, alertStateSnap, automationSnap] = await Promise.all([
+  const commandsCollection = db.collection('devices').doc(deviceId).collection('commands');
+  const [globalSnap, overrideSnap, alertStateSnap, recentCommandSnap] = await Promise.all([
     db.collection('settings').doc('sensors').get(),
     db.collection('devices').doc(deviceId).collection('configs').doc('sensors').get(),
     db.collection('devices').doc(deviceId).collection('alert_state').doc('current').get(),
-    db.collection('devices').doc(deviceId).collection('automation').doc('tds').get(),
+    commandsCollection.orderBy('requestedAt', 'desc').limit(25).get(),
   ]);
 
   const globalSettings = normalizeGlobalSettings(globalSnap.data());
@@ -597,143 +665,88 @@ async function evaluateAndPersistDeviceAlerts(deviceId, { deviceData } = {}) {
 
   await batch.commit();
 
-  const automationRef = db.collection('devices').doc(deviceId).collection('automation').doc('tds');
-  const automationData = automationSnap.exists ? automationSnap.data() : {};
-  const automationActive = asBool(automationData.active, false);
-  const automationStartedAt = asDate(automationData.startedAt);
   const autoDoseEnabled = asBool(
     effective.automation.lowTdsAutoDoseEnabled,
     DEFAULT_SETTINGS.automation.lowTdsAutoDoseEnabled,
   );
-  const maxRunSec = Math.max(
-    60,
-    asInt(effective.automation.pumpMaxRunSec, DEFAULT_SETTINGS.automation.pumpMaxRunSec),
-  );
-  const currentTds = readings.tdsPpm;
-  const targetTdsMax = effective.thresholds.tdsMaxPpm;
+  const recentCommandDocs = recentCommandSnap.docs;
+  const commandBatch = db.batch();
 
-  const now = Date.now();
-  const elapsedSec = automationStartedAt
-    ? Math.floor((now - automationStartedAt.getTime()) / 1000)
-    : 0;
-
-  const shouldStopOnTarget =
-    automationActive &&
-    currentTds != null &&
-    currentTds >= targetTdsMax &&
-    String(effective.automation.stopTarget || 'tds_max') === 'tds_max';
-  const shouldStopOnTimeout = automationActive && elapsedSec >= maxRunSec;
-
-  if (shouldStopOnTarget || shouldStopOnTimeout) {
-    const reason = shouldStopOnTarget ? 'auto_dose_completed' : 'auto_dose_timeout';
-    await db.runTransaction(async (tx) => {
-      const currentAutomationSnap = await tx.get(automationRef);
-      const liveAutomation = currentAutomationSnap.exists ? currentAutomationSnap.data() : {};
-      if (!asBool(liveAutomation.active, false)) return;
-
-      const commandRef = db.collection('devices').doc(deviceId).collection('commands').doc();
-      const alertRef = alertsCollection.doc();
-
-      tx.set(commandRef, commandPayload(false, reason));
-      tx.set(
-        automationRef,
-        {
-          active: false,
-          startedAt: null,
-          targetTdsMax,
-          timeoutSec: maxRunSec,
-          lastAction: reason,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
-        { merge: true },
-      );
-      tx.set(alertRef, {
-        eventType: reason,
-        metric: 'tds',
-        state: evaluation.metrics.tds,
-        value: currentTds,
-        message:
-          reason === 'auto_dose_completed'
-            ? 'Auto-dose completed after reaching TDS target'
-            : 'Auto-dose timed out after maximum run time',
-        thresholdSnapshot: thresholdSnapshot(effective.thresholds),
-        source: effective.source,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    });
-    return { status: 'ok' };
+  if (
+    evaluation.metrics.waterLevel === 'low' &&
+    !relayStates.fishToFilter &&
+    !hasRecentActiveCommand(recentCommandDocs, 'fish_to_filter', true)
+  ) {
+    commandBatch.set(
+      commandsCollection.doc(),
+      relayCommandPayload('fish_to_filter', true, 'water_level_low'),
+    );
+  } else if (
+    evaluation.metrics.waterLevel === 'normal' &&
+    relayStates.fishToFilter &&
+    !hasRecentActiveCommand(recentCommandDocs, 'fish_to_filter', false)
+  ) {
+    commandBatch.set(
+      commandsCollection.doc(),
+      relayCommandPayload('fish_to_filter', false, 'water_level_recovered'),
+    );
   }
 
-  if (!automationActive && autoDoseEnabled && evaluation.metrics.tds === 'low') {
-    await db.runTransaction(async (tx) => {
-      const currentAutomationSnap = await tx.get(automationRef);
-      const liveAutomation = currentAutomationSnap.exists ? currentAutomationSnap.data() : {};
-      if (asBool(liveAutomation.active, false)) return;
-
-      const commandRef = db.collection('devices').doc(deviceId).collection('commands').doc();
-      const alertRef = alertsCollection.doc();
-
-      tx.set(commandRef, commandPayload(true, 'auto_dose_started'));
-      tx.set(
-        automationRef,
-        {
-          active: true,
-          startedAt: admin.firestore.FieldValue.serverTimestamp(),
-          targetTdsMax,
-          timeoutSec: maxRunSec,
-          lastAction: 'auto_dose_started',
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
-        { merge: true },
+  if (evaluation.metrics.ph === 'low') {
+    if (!relayStates.phUp && !hasRecentActiveCommand(recentCommandDocs, 'ph_up', true)) {
+      commandBatch.set(commandsCollection.doc(), relayCommandPayload('ph_up', true, 'ph_low'));
+    }
+    if (relayStates.phDown && !hasRecentActiveCommand(recentCommandDocs, 'ph_down', false)) {
+      commandBatch.set(commandsCollection.doc(), relayCommandPayload('ph_down', false, 'ph_low'));
+    }
+  } else if (evaluation.metrics.ph === 'high') {
+    if (!relayStates.phDown && !hasRecentActiveCommand(recentCommandDocs, 'ph_down', true)) {
+      commandBatch.set(commandsCollection.doc(), relayCommandPayload('ph_down', true, 'ph_high'));
+    }
+    if (relayStates.phUp && !hasRecentActiveCommand(recentCommandDocs, 'ph_up', false)) {
+      commandBatch.set(commandsCollection.doc(), relayCommandPayload('ph_up', false, 'ph_high'));
+    }
+  } else {
+    if (relayStates.phUp && !hasRecentActiveCommand(recentCommandDocs, 'ph_up', false)) {
+      commandBatch.set(
+        commandsCollection.doc(),
+        relayCommandPayload('ph_up', false, 'ph_recovered'),
       );
-      tx.set(alertRef, {
-        eventType: 'auto_dose_started',
-        metric: 'tds',
-        state: evaluation.metrics.tds,
-        value: currentTds,
-        message: 'Auto-dose started because TDS is below minimum',
-        thresholdSnapshot: thresholdSnapshot(effective.thresholds),
-        source: effective.source,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    });
-    return { status: 'ok' };
+    }
+    if (relayStates.phDown && !hasRecentActiveCommand(recentCommandDocs, 'ph_down', false)) {
+      commandBatch.set(
+        commandsCollection.doc(),
+        relayCommandPayload('ph_down', false, 'ph_recovered'),
+      );
+    }
   }
 
-  if (automationActive && !autoDoseEnabled) {
-    await db.runTransaction(async (tx) => {
-      const currentAutomationSnap = await tx.get(automationRef);
-      const liveAutomation = currentAutomationSnap.exists ? currentAutomationSnap.data() : {};
-      if (!asBool(liveAutomation.active, false)) return;
-
-      const commandRef = db.collection('devices').doc(deviceId).collection('commands').doc();
-      const alertRef = alertsCollection.doc();
-
-      tx.set(commandRef, commandPayload(false, 'auto_dose_disabled'));
-      tx.set(
-        automationRef,
-        {
-          active: false,
-          startedAt: null,
-          targetTdsMax,
-          timeoutSec: maxRunSec,
-          lastAction: 'auto_dose_disabled',
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
-        { merge: true },
-      );
-      tx.set(alertRef, {
-        eventType: 'auto_dose_disabled',
-        metric: 'tds',
-        state: evaluation.metrics.tds,
-        value: currentTds,
-        message: 'Auto-dose stopped because automation was disabled',
-        thresholdSnapshot: thresholdSnapshot(effective.thresholds),
-        source: effective.source,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    });
+  if (
+    autoDoseEnabled &&
+    evaluation.metrics.tds === 'low' &&
+    !relayStates.nutrient &&
+    !hasRecentActiveCommand(recentCommandDocs, 'nutrient', true)
+  ) {
+    commandBatch.set(
+      commandsCollection.doc(),
+      relayCommandPayload('nutrient', true, 'tds_low'),
+    );
+  } else if (
+    relayStates.nutrient &&
+    (!autoDoseEnabled || evaluation.metrics.tds === 'normal' || evaluation.metrics.tds === 'high') &&
+    !hasRecentActiveCommand(recentCommandDocs, 'nutrient', false)
+  ) {
+    commandBatch.set(
+      commandsCollection.doc(),
+      relayCommandPayload(
+        'nutrient',
+        false,
+        autoDoseEnabled ? 'tds_recovered' : 'nutrient_automation_disabled',
+      ),
+    );
   }
+
+  await commandBatch.commit();
 
   return { status: 'ok' };
 }
@@ -837,5 +850,88 @@ exports.cleanupOldAlerts = onSchedule(
     }
 
     console.log(`cleanupOldAlerts deleted ${totalDeleted} docs`);
+  },
+);
+
+exports.dispatchFeedingSchedules = onSchedule(
+  {
+    schedule: 'every 1 minutes',
+    timeZone: 'Etc/UTC',
+  },
+  async () => {
+    const db = admin.firestore();
+    let lastDocId = null;
+    let created = 0;
+
+    while (true) {
+      let query = db
+        .collection('devices')
+        .orderBy(admin.firestore.FieldPath.documentId())
+        .limit(FEEDER_SCAN_BATCH_SIZE);
+
+      if (lastDocId != null) {
+        query = query.startAfter(lastDocId);
+      }
+
+      const snapshot = await query.get();
+      if (snapshot.empty) break;
+
+      for (const doc of snapshot.docs) {
+        const data = doc.data() || {};
+        const automation = asMap(data.automation);
+        if (!asBool(automation.feedingEnabled, false)) continue;
+
+        const rawTimes = Array.isArray(automation.feedingTimes)
+          ? automation.feedingTimes.map((value) => asString(value).trim()).filter(Boolean)
+          : [];
+        if (rawTimes.length === 0) continue;
+
+        const durationSec = Math.max(1, asInt(automation.feedingDurationSec, 8));
+        const timeZone = asString(automation.timeZone || data.timeZone || 'Etc/UTC', 'Etc/UTC');
+        const nowParts = relayTimeParts(new Date(), timeZone);
+        if (!rawTimes.includes(nowParts.timeKey)) continue;
+
+        const scheduleRef = db
+          .collection('devices')
+          .doc(doc.id)
+          .collection('automation')
+          .doc('feeding_schedule');
+
+        const runKey = `${nowParts.dateKey}_${nowParts.timeKey}`;
+        await db.runTransaction(async (tx) => {
+          const scheduleSnap = await tx.get(scheduleRef);
+          const lastRunKey = scheduleSnap.exists
+            ? asString(scheduleSnap.get('lastRunKey') || '')
+            : '';
+          if (lastRunKey === runKey) return;
+
+          const commandRef = db.collection('devices').doc(doc.id).collection('commands').doc();
+          tx.set(
+            commandRef,
+            relayCommandPayload(
+              'fish_feeder',
+              true,
+              'feeding_schedule',
+              { durationMs: durationSec * 1000 },
+            ),
+          );
+          tx.set(
+            scheduleRef,
+            {
+              lastRunKey: runKey,
+              lastDurationSec: durationSec,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          );
+          created += 1;
+        });
+      }
+
+      lastDocId = snapshot.docs[snapshot.docs.length - 1].id;
+      if (snapshot.size < FEEDER_SCAN_BATCH_SIZE) break;
+    }
+
+    console.log(`dispatchFeedingSchedules processed feeder commands=${created}`);
   },
 );

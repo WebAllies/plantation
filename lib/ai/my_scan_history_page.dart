@@ -57,7 +57,7 @@ class MyScanHistoryPage extends StatelessWidget {
           return ListView.separated(
             padding: const EdgeInsets.all(12),
             itemCount: docs.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            separatorBuilder: (_, _) => const SizedBox(height: 8),
             itemBuilder: (context, i) {
               final d = docs[i].data() as Map<String, dynamic>;
               final predictedClass = (d['predictedClass'] ?? d['label'] ?? '')
