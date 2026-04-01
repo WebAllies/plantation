@@ -5,6 +5,7 @@
 #include <PubSubClient.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <ESP32Servo.h>
 #include <math.h>
 #include <stdlib.h>
 #include <time.h>
@@ -39,8 +40,12 @@ const int RELAY_PH_UP_PIN = 18;
 const int RELAY_PH_DOWN_PIN = 19;
 const int RELAY_NUTRIENT_PIN = 21;
 const int RELAY_FISH_TO_FILTER_PIN = 22;
-const int RELAY_FISH_FEEDER_PIN = 23;
+const int FISH_FEEDER_SERVO_PIN = 23;
 const bool RELAY_ACTIVE_HIGH = true;
+const int FISH_FEEDER_SERVO_IDLE_DEG = 0;
+const int FISH_FEEDER_SERVO_ACTIVE_DEG = 90;
+const int FISH_FEEDER_SERVO_MIN_US = 500;
+const int FISH_FEEDER_SERVO_MAX_US = 2400;
 
 // UART from optional Arduino Nano. Protect ESP32 RX from 5V Nano TX with a level shifter/divider.
 const bool USE_UNO_UART = true;
@@ -100,6 +105,7 @@ PubSubClient mqttClient(mqttSecureClient);
 HardwareSerial unoSerial(2);
 OneWire oneWire(TEMP_ONEWIRE_PIN);
 DallasTemperature waterTempSensor(&oneWire);
+Servo fishFeederServo;
 
 unsigned long lastSensorMs = 0;
 unsigned long lastStatusMs = 0;
@@ -242,6 +248,14 @@ void setRelayOutputPin(int pin, bool state) {
   digitalWrite(pin, level);
 }
 
+void setFishFeederServoState(bool active) {
+  if (!fishFeederServo.attached()) return;
+
+  int angle = active ? FISH_FEEDER_SERVO_ACTIVE_DEG : FISH_FEEDER_SERVO_IDLE_DEG;
+  angle = (int)clampFloat((float)angle, 0.0f, 180.0f);
+  fishFeederServo.write(angle);
+}
+
 bool *relayStatePtr(const String &type) {
   if (type == "ph_up") return &relayPhUpState;
   if (type == "ph_down") return &relayPhDownState;
@@ -256,7 +270,6 @@ int relayPinForType(const String &type) {
   if (type == "ph_down") return RELAY_PH_DOWN_PIN;
   if (type == "nutrient") return RELAY_NUTRIENT_PIN;
   if (type == "fish_to_filter") return RELAY_FISH_TO_FILTER_PIN;
-  if (type == "fish_feeder") return RELAY_FISH_FEEDER_PIN;
   return -1;
 }
 
@@ -277,8 +290,16 @@ String relayStateSummary() {
 
 void applyRelayState(const String &type, bool state) {
   bool *statePtr = relayStatePtr(type);
+  if (statePtr == nullptr) return;
+
+  if (type == "fish_feeder") {
+    *statePtr = state;
+    setFishFeederServoState(state);
+    return;
+  }
+
   int pin = relayPinForType(type);
-  if (statePtr == nullptr || pin < 0) return;
+  if (pin < 0) return;
 
   *statePtr = state;
   setRelayOutputPin(pin, state);
@@ -719,7 +740,7 @@ void finalizeFeederPulse() {
   feederPulseActive = false;
   feederPulseEndMs = 0;
   applyRelayState("fish_feeder", false);
-  logEvent("info", "relay_pulse_completed", "fish_feeder pulse completed");
+  logEvent("info", "feeder_servo_completed", "fish_feeder servo returned to idle");
   updateDeviceStatus(true);
   broadcastSnapshot();
   publishMqttSnapshot();
@@ -728,7 +749,7 @@ void finalizeFeederPulse() {
     patchCommandStatus(
       feederPulseCommandPath,
       "executed",
-      String("fish_feeder pulse completed after ") + String(feederPulseDurationMs) + " ms",
+      String("fish_feeder servo completed after ") + String(feederPulseDurationMs) + " ms",
       true
     );
   }
@@ -779,8 +800,8 @@ void executeCommand(
       msg = "durationMs is required for fish_feeder";
       logEvent("warn", "command_failed", "fish_feeder missing durationMs");
     } else if (feederPulseActive) {
-      msg = "fish_feeder pulse already active";
-       logEvent("warn", "command_failed", msg);
+      msg = "fish_feeder servo already active";
+      logEvent("warn", "command_failed", msg);
     } else {
       applyRelayState("fish_feeder", true);
       feederPulseActive = true;
@@ -789,8 +810,8 @@ void executeCommand(
       feederPulseCommandPath = docPath;
       logEvent(
         "info",
-        "relay_pulse_started",
-        String("fish_feeder pulse started for ") + String(durationMs) + " ms"
+        "feeder_servo_started",
+        String("fish_feeder servo active for ") + String(durationMs) + " ms"
       );
       updateDeviceStatus(true);
       broadcastSnapshot();
@@ -798,7 +819,7 @@ void executeCommand(
       patchCommandStatus(
         docPath,
         "executing",
-        String("fish_feeder pulse running for ") + String(durationMs) + " ms",
+        String("fish_feeder servo active for ") + String(durationMs) + " ms",
         false
       );
       return;
@@ -958,7 +979,13 @@ void setup() {
   pinMode(RELAY_PH_DOWN_PIN, OUTPUT);
   pinMode(RELAY_NUTRIENT_PIN, OUTPUT);
   pinMode(RELAY_FISH_TO_FILTER_PIN, OUTPUT);
-  pinMode(RELAY_FISH_FEEDER_PIN, OUTPUT);
+  ESP32PWM::allocateTimer(0);
+  fishFeederServo.setPeriodHertz(50);
+  fishFeederServo.attach(
+    FISH_FEEDER_SERVO_PIN,
+    FISH_FEEDER_SERVO_MIN_US,
+    FISH_FEEDER_SERVO_MAX_US
+  );
   applyRelayState("ph_up", false);
   applyRelayState("ph_down", false);
   applyRelayState("nutrient", false);

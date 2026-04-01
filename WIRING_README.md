@@ -77,18 +77,23 @@ Current architecture:
 - Nano `GND` -> ESP32 `GND`
 - Optional: ESP32 `GPIO 17` -> Nano `RX` if you later want 2-way serial
 
-### ESP32 Relay Outputs
+### ESP32 Outputs
 - `GPIO 18` -> pH Up relay input
 - `GPIO 19` -> pH Down relay input
 - `GPIO 21` -> nutrient relay input
 - `GPIO 22` -> fish tank to filter bed relay input
-- `GPIO 23` -> fish feeder relay input
+- `GPIO 23` -> fish feeder servo signal
 - relay module `GND` -> ESP32 `GND`
 - relay module `VCC` -> module-rated supply
+- fish feeder servo `GND` -> common `GND`
+- fish feeder servo `VCC` -> stable `5V` supply
+- fish feeder servo `SIG` -> ESP32 `GPIO 23`
 
 Note:
 - current firmware assumes active-high relay control
 - if your relay board is active-low, firmware constants must be adjusted
+- the fish feeder is now a servo, not a relay
+- do not power the servo from the ESP32 `3.3V` pin
 
 ## Required Common Ground
 All grounds must be connected together:
@@ -175,6 +180,7 @@ Meaning:
 
 ### ESP32
 - `Firebase ESP Client`
+- `ESP32Servo`
 - `WebSockets`
 - `PubSubClient`
 - `OneWire`
