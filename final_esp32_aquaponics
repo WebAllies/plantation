@@ -14,8 +14,8 @@
 #include "addons/RTDBHelper.h"
 
 // -------------------- WIFI --------------------
-#define WIFI_SSID "Seif_2.4GHz"
-#define WIFI_PASS "Repiphany2"
+#define WIFI_SSID "Muhammad's A55 "
+#define WIFI_PASS "qwertyuiop"
 
 // -------------------- FIREBASE --------------------
 #define API_KEY "AIzaSyCKU-jSEXoftXGq9653hJql7YWXG7_Rtr8"
