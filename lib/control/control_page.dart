@@ -32,11 +32,39 @@ class _ControlPageState extends State<ControlPage> {
   bool _hydratedFromFirestore = false;
   static const int _feederRotations = 2;
 
+  // Timed manual dosing (app-side auto-off) for the pH up/down and nutrient pumps.
+  static const List<int> _doseDurationsSec = [3, 5, 10];
+  final Set<String> _dosingRelays = <String>{};
+  final Map<String, Timer> _doseTimers = <String, Timer>{};
+
+  @override
+  void dispose() {
+    final deviceId = widget.selectedDeviceId;
+    for (final entry in _doseTimers.entries) {
+      entry.value.cancel();
+      // Best-effort auto-off so a dosing pump is never left running when the
+      // page is disposed mid-dose.
+      if (deviceId != null) {
+        unawaited(
+          _sendCommand(
+            deviceId: deviceId,
+            type: entry.key,
+            targetState: false,
+            announce: false,
+          ),
+        );
+      }
+    }
+    _doseTimers.clear();
+    super.dispose();
+  }
+
   Future<void> _sendCommand({
     required String deviceId,
     required String type,
     bool? targetState,
     int? durationSec,
+    bool announce = true,
   }) async {
     final sentLocal = await _localBackend.sendCommand(
       deviceId: deviceId,
@@ -45,10 +73,11 @@ class _ControlPageState extends State<ControlPage> {
       durationSec: durationSec,
     );
     if (sentLocal) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("${type.toUpperCase()} queued locally")),
-      );
+      if (announce && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("${type.toUpperCase()} queued locally")),
+        );
+      }
       return;
     }
 
@@ -80,6 +109,8 @@ class _ControlPageState extends State<ControlPage> {
 
     await cmdRef.set(payload);
 
+    if (!announce) return;
+
     // Wait for executed / failed feedback
     late StreamSubscription<DocumentSnapshot> sub;
     sub = cmdRef.snapshots().listen((doc) {
@@ -102,6 +133,99 @@ class _ControlPageState extends State<ControlPage> {
         sub.cancel();
       }
     });
+  }
+
+  /// Runs a dosing pump for [durationSec] then turns it off automatically
+  /// (app-side timer). The ON/OFF commands are sent silently; this method
+  /// shows its own dose progress feedback.
+  Future<void> _doseRelay({
+    required String deviceId,
+    required String type,
+    required String label,
+    required int durationSec,
+  }) async {
+    if (_dosingRelays.contains(type)) return;
+    setState(() => _dosingRelays.add(type));
+
+    await _sendCommand(
+      deviceId: deviceId,
+      type: type,
+      targetState: true,
+      announce: false,
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("$label dosing for ${durationSec}s…")),
+      );
+    }
+
+    _doseTimers[type]?.cancel();
+    _doseTimers[type] = Timer(Duration(seconds: durationSec), () async {
+      await _sendCommand(
+        deviceId: deviceId,
+        type: type,
+        targetState: false,
+        announce: false,
+      );
+      _doseTimers.remove(type);
+      if (!mounted) return;
+      setState(() => _dosingRelays.remove(type));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("$label dose complete (auto-off)")),
+      );
+    });
+  }
+
+  Widget _doseRow({
+    required String deviceId,
+    required String type,
+    required String label,
+    required bool enabled,
+  }) {
+    final isDosing = _dosingRelays.contains(type);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  isDosing ? "Dosing… (auto-off)" : "Tap a duration to dose",
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDosing
+                        ? Colors.orange.shade800
+                        : Colors.grey.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ..._doseDurationsSec.map((sec) {
+            return Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: OutlinedButton(
+                onPressed: (!enabled || isDosing)
+                    ? null
+                    : () => _doseRelay(
+                        deviceId: deviceId,
+                        type: type,
+                        label: label,
+                        durationSec: sec,
+                      ),
+                child: Text("${sec}s"),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
   }
 
   Future<void> _setControlMode({
@@ -508,6 +632,55 @@ class _ControlPageState extends State<ControlPage> {
 
               const SizedBox(height: 12),
 
+              // ===== Timed Dosing (app-side auto-off) =====
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Timed Dosing (auto-off)",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        isAuto
+                            ? "Disabled (Automation is active)"
+                            : "Runs the pump for the selected time, then turns it off automatically.",
+                        style: TextStyle(
+                          color: Colors.grey.shade700,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      _doseRow(
+                        deviceId: deviceId,
+                        type: 'ph_up',
+                        label: 'pH Up',
+                        enabled: !isAuto,
+                      ),
+                      const Divider(height: 1),
+                      _doseRow(
+                        deviceId: deviceId,
+                        type: 'ph_down',
+                        label: 'pH Down',
+                        enabled: !isAuto,
+                      ),
+                      const Divider(height: 1),
+                      _doseRow(
+                        deviceId: deviceId,
+                        type: 'nutrient',
+                        label: 'Nutrient',
+                        enabled: !isAuto,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
               // ===== Feeding Schedule =====
               Card(
                 child: Padding(
@@ -704,6 +877,7 @@ class _ControlPageState extends State<ControlPage> {
               const SizedBox(height: 6),
               const Text(
                 "• Manual toggles create a command in devices/{deviceId}/commands\n"
+                "• Timed dosing turns a pump ON, then the app turns it OFF after the chosen seconds\n"
                 "• ESP32 executes it and updates status to executed/failed\n"
                 "• Feeding schedule + auto-fill are stored in devices/{deviceId}.automation\n"
                 "• AUTO mode means ESP32 should run scheduled feeding + auto-fill logic",
