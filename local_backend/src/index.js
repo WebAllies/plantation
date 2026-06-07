@@ -33,6 +33,8 @@ async function main() {
     port: config.mqttPort,
   });
   mqtt.start();
+  // Let the WebSocket hub publish app commands straight to MQTT.
+  hub.attachMqtt(mqtt);
 
   const app = createHttpApi({
     db,

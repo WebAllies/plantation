@@ -558,8 +558,11 @@ void pollUnoSerial() {
 }
 
 float readTemperatureC() {
-  waterTempSensor.requestTemperatures();
+  // Read the result of the previous (already-completed) conversion, then kick
+  // off the next one without blocking. SENSOR_INTERVAL_MS (1000ms) is well
+  // above the ~750ms conversion time, so the reading is always ready.
   float temp = waterTempSensor.getTempCByIndex(0);
+  waterTempSensor.requestTemperatures();
   if (!isfinite(temp) || temp == DEVICE_DISCONNECTED_C) return NAN;
   return temp;
 }
@@ -755,6 +758,10 @@ void broadcastSnapshot() {
 void logEvent(const String &level, const String &event, const String &detail) {
   printConsoleLine("event", level + "/" + event + " - " + detail);
 
+  // Skip the blocking Firestore event-log write while the local backend link
+  // is up so command handling and telemetry stay responsive.
+  if (mqttClient.connected()) return;
+
   FirebaseJson content;
   if (!setTimestampField(content, "fields/ts/timestampValue")) return;
   content.set("fields/level/stringValue", level);
@@ -812,6 +819,11 @@ void setDeviceFields(FirebaseJson &content) {
 
 void updateDeviceStatus(bool online) {
   printConsoleLine("device_status", String(online ? "online" : "offline") + " " + buildSnapshotJson());
+
+  // The local backend derives device online/offline + relay state from MQTT
+  // (telemetry, status topic LWT, command snapshots) and mirrors it to
+  // Firestore, so skip this blocking Firestore write while MQTT is connected.
+  if (mqttClient.connected()) return;
 
   FirebaseJson content;
   setDeviceFields(content);
@@ -908,6 +920,12 @@ bool patchCommandStatus(
   const String &message,
   bool includeExecutedAt
 ) {
+  // Acknowledge over MQTT first (fast, non-blocking). When the local backend
+  // link is up it records command status from this ack, so skip the blocking
+  // Firestore write that would otherwise stall the loop after every command.
+  publishMqttCommandAck(commandIdFromDocPath(docPath), status, message);
+  if (mqttClient.connected()) return true;
+
   FirebaseJson patch;
   patch.set("fields/status/stringValue", status);
   patch.set("fields/message/stringValue", message);
@@ -925,7 +943,6 @@ bool patchCommandStatus(
     updateMask.c_str()
   );
   printFirestoreResult("patchCommandStatus", patchOk);
-  publishMqttCommandAck(commandIdFromDocPath(docPath), status, message);
   return patchOk;
 }
 
@@ -1279,6 +1296,12 @@ void setup() {
   }
 
   waterTempSensor.begin();
+  // Non-blocking temperature reads: requestTemperatures() returns immediately
+  // and we read the result on the next sensor cycle. This keeps the main loop
+  // (and therefore MQTT command handling) responsive instead of stalling
+  // ~750ms per conversion.
+  waterTempSensor.setWaitForConversion(false);
+  waterTempSensor.requestTemperatures();
 
   connectWifi();
 
@@ -1350,25 +1373,34 @@ void loop() {
     acquireSensors();
     broadcastSnapshot();
     publishMqttSnapshot();
+    // Service MQTT again right after publishing so a command that arrived
+    // during sensor work is handled without waiting for the next loop pass.
+    mqttClient.loop();
   }
 
+  // When the MQTT/local backend link is up, commands and status flow over MQTT.
+  // Skip the blocking Firestore REST poll and Firebase status writes in that
+  // case so they don't stall the loop and delay live command handling. They
+  // resume automatically as a fallback whenever MQTT is disconnected.
+  const bool mqttUp = mqttClient.connected();
+
   if (!Firebase.ready()) {
-    delay(50);
+    delay(mqttUp ? 5 : 50);
     return;
   }
 
   if (millis() - lastStatusMs >= STATUS_INTERVAL_MS) {
     lastStatusMs = millis();
-    updateDeviceStatus(true);
+    if (!mqttUp) updateDeviceStatus(true);
   }
 
   if (millis() - lastCmdPollMs >= CMD_POLL_INTERVAL_MS) {
     lastCmdPollMs = millis();
-    pollLatestPendingCommand();
+    if (!mqttUp) pollLatestPendingCommand();
   }
 
   if (millis() - lastHistoryMs >= HISTORY_INTERVAL_MS) {
     lastHistoryMs = millis();
-    writeReadingSnapshot();
+    if (!mqttUp) writeReadingSnapshot();
   }
 }

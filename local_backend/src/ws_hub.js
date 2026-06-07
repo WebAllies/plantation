@@ -12,12 +12,18 @@ function parseJsonMessage(raw) {
 }
 
 class WsHub {
-  constructor({ server, db, requireAuth, logger = console }) {
+  constructor({ server, db, requireAuth, mqtt = null, logger = console }) {
     this.db = db;
     this.requireAuth = requireAuth;
+    this.mqtt = mqtt;
     this.logger = logger;
     this.wss = new WebSocketServer({ server, path: '/ws' });
     this.clients = new Map();
+  }
+
+  // The MQTT broker is created after the hub, so it is attached afterwards.
+  attachMqtt(mqtt) {
+    this.mqtt = mqtt;
   }
 
   start() {
@@ -56,6 +62,42 @@ class WsHub {
 
     if (message.type === 'ping') {
       socket.send(JSON.stringify({ type: 'pong', ts: new Date().toISOString() }));
+      return;
+    }
+
+    if (message.type === 'command') {
+      await this.handleCommandMessage(socket, message);
+    }
+  }
+
+  // Accept device commands over the WebSocket so the app can send them on the
+  // already-open connection (no per-press HTTP handshake). Same path as the
+  // HTTP endpoint: persist -> publish to MQTT -> broadcast.
+  async handleCommandMessage(socket, message) {
+    const meta = this.clients.get(socket) || {};
+    const requestId = message.requestId != null ? message.requestId : null;
+    const deviceId = String(message.deviceId || meta.deviceId || '');
+    const commandBody =
+      message.payload && typeof message.payload === 'object' ? message.payload : message;
+
+    try {
+      if (!deviceId) throw new Error('deviceId is required');
+      const command = await this.db.createCommand(deviceId, commandBody, meta.user || null);
+      if (this.mqtt) this.mqtt.publishCommand(command);
+      this.broadcast('command', command);
+      socket.send(
+        JSON.stringify({ type: 'command_result', requestId, ok: true, command }),
+      );
+    } catch (error) {
+      this.logger.warn(`[ws] command failed: ${error.message || error}`);
+      socket.send(
+        JSON.stringify({
+          type: 'command_result',
+          requestId,
+          ok: false,
+          error: error.message || String(error),
+        }),
+      );
     }
   }
 

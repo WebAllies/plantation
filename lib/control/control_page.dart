@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:iot_aqua_app/core/device/device_selector_header.dart';
 import 'package:iot_aqua_app/core/local/local_backend_command_service.dart';
+import 'package:iot_aqua_app/core/local/local_backend_command_socket.dart';
 
 class ControlPage extends StatefulWidget {
   const ControlPage({super.key, required this.selectedDeviceId});
@@ -66,6 +67,23 @@ class _ControlPageState extends State<ControlPage> {
     int? durationSec,
     bool announce = true,
   }) async {
+    // Fastest path: send over the already-open WebSocket (no HTTP handshake).
+    final sentWs = await LocalBackendCommandSocket.instance.sendCommand(
+      deviceId: deviceId,
+      type: type,
+      targetState: targetState,
+      durationSec: durationSec,
+    );
+    if (sentWs) {
+      if (announce && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("${type.toUpperCase()} sent")),
+        );
+      }
+      return;
+    }
+
+    // Fallback: HTTP command endpoint on the local backend.
     final sentLocal = await _localBackend.sendCommand(
       deviceId: deviceId,
       type: type,
@@ -334,6 +352,9 @@ class _ControlPageState extends State<ControlPage> {
         ),
       );
     }
+
+    // Pre-warm the command WebSocket so the first button press is instant.
+    unawaited(LocalBackendCommandSocket.instance.ensureConnected(deviceId));
 
     final devRef = FirebaseFirestore.instance
         .collection('devices')
