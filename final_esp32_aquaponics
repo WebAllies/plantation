@@ -14,7 +14,8 @@
 #include "addons/RTDBHelper.h"
 
 // -------------------- WIFI --------------------
-#define WIFI_SSID "Muhammad's A55 "
+#define WIFI_SSID "muhammad"
+#define WIFI_SSID_FALLBACK "Muhammad"
 #define WIFI_PASS "qwertyuiop"
 
 // -------------------- FIREBASE --------------------
@@ -60,6 +61,7 @@ const unsigned long STATUS_INTERVAL_MS = 5000;
 const unsigned long CMD_POLL_INTERVAL_MS = 2000;
 const unsigned long HISTORY_INTERVAL_MS = 300000;
 const unsigned long MQTT_RECONNECT_INTERVAL_MS = 5000;
+const bool CONSOLE_OUTPUT_ENABLED = true;
 const char *NTP_SERVER_1 = "pool.ntp.org";
 const char *NTP_SERVER_2 = "time.google.com";
 const char *NTP_SERVER_3 = "time.nist.gov";
@@ -151,6 +153,8 @@ SensorChannel phUpLevelChannel = {"phUpTankLevel", 100.0f, 100.0f, 0, true};
 SensorChannel phDownLevelChannel = {"phDownTankLevel", 100.0f, 100.0f, 0, true};
 SensorChannel nutrientLevelChannel = {"nutrientTankLevel", 100.0f, 100.0f, 0, true};
 
+String buildSnapshotJson();
+
 String deviceDocPath() {
   return String("devices/") + deviceId;
 }
@@ -213,6 +217,119 @@ void printFirestoreResult(const String &operation, bool ok) {
     return;
   }
   Serial.println("[Firestore] " + operation + " FAIL: " + fbdo.errorReason());
+}
+
+void printConsoleLine(const String &label, const String &value) {
+  if (!CONSOLE_OUTPUT_ENABLED) return;
+  Serial.print("[Console] ");
+  Serial.print(label);
+  Serial.print(": ");
+  Serial.println(value);
+}
+
+void printConsoleJson(const String &label, const String &payload) {
+  printConsoleLine(label, payload);
+}
+
+const char *wifiStatusLabel(wl_status_t status) {
+  switch (status) {
+    case WL_IDLE_STATUS:
+      return "idle";
+    case WL_NO_SSID_AVAIL:
+      return "ssid_not_available";
+    case WL_SCAN_COMPLETED:
+      return "scan_completed";
+    case WL_CONNECTED:
+      return "connected";
+    case WL_CONNECT_FAILED:
+      return "connect_failed";
+    case WL_CONNECTION_LOST:
+      return "connection_lost";
+    case WL_DISCONNECTED:
+      return "disconnected";
+    default:
+      return "unknown";
+  }
+}
+
+void printWifiScan() {
+  Serial.println("[WiFi] scanning nearby networks");
+  int networkCount = WiFi.scanNetworks();
+  if (networkCount < 0) {
+    Serial.printf("[WiFi] scan failed: %d\n", networkCount);
+    return;
+  }
+
+  Serial.printf("[WiFi] scan found %d network(s)\n", networkCount);
+  for (int i = 0; i < networkCount; i++) {
+    Serial.printf(
+      "[WiFi] #%d SSID='%s' RSSI=%d dBm channel=%d encryption=%d%s\n",
+      i + 1,
+      WiFi.SSID(i).c_str(),
+      WiFi.RSSI(i),
+      WiFi.channel(i),
+      WiFi.encryptionType(i),
+      WiFi.SSID(i) == WIFI_SSID ? " <-- target" : ""
+    );
+  }
+}
+
+bool connectWifiCandidate(const char *ssid, const char *password, unsigned long timeoutMs) {
+  Serial.printf("[WiFi] connecting to SSID='%s'\n", ssid);
+  WiFi.begin(ssid, password);
+
+  unsigned long startMs = millis();
+  wl_status_t lastStatus = WL_IDLE_STATUS;
+  unsigned long lastStatusPrintMs = 0;
+  while (millis() - startMs < timeoutMs) {
+    wl_status_t status = WiFi.status();
+    if (status != lastStatus) {
+      Serial.printf("[WiFi] status=%s (%d)\n", wifiStatusLabel(status), status);
+      lastStatus = status;
+      lastStatusPrintMs = millis();
+    } else if (millis() - lastStatusPrintMs >= 3000) {
+      Serial.printf("[WiFi] still %s (%d)\n", wifiStatusLabel(status), status);
+      lastStatusPrintMs = millis();
+    }
+    if (status == WL_CONNECTED) {
+      Serial.println("[WiFi] connected");
+      Serial.println("[WiFi] ip=" + WiFi.localIP().toString());
+      Serial.printf("[WiFi] rssi=%d dBm\n", WiFi.RSSI());
+      return true;
+    }
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println();
+  Serial.printf("[WiFi] failed to connect to SSID='%s', final status=%s (%d)\n",
+                ssid,
+                wifiStatusLabel(WiFi.status()),
+                WiFi.status());
+  WiFi.disconnect(false);
+  delay(1000);
+  return false;
+}
+
+void connectWifi() {
+  WiFi.persistent(false);
+  WiFi.disconnect(true, true);
+  delay(1000);
+  WiFi.mode(WIFI_STA);
+  WiFi.setSleep(false);
+  delay(500);
+
+  printWifiScan();
+
+  while (WiFi.status() != WL_CONNECTED) {
+    if (connectWifiCandidate(WIFI_SSID, WIFI_PASS, 20000)) return;
+    if (String(WIFI_SSID_FALLBACK) != String(WIFI_SSID) &&
+        connectWifiCandidate(WIFI_SSID_FALLBACK, WIFI_PASS, 20000)) {
+      return;
+    }
+    Serial.println("[WiFi] retrying after failed connection attempts");
+    delay(3000);
+  }
 }
 
 float clampFloat(float value, float minValue, float maxValue) {
@@ -371,6 +488,7 @@ void parseUnoLine(const String &line) {
 
   float value = NAN;
   if (!parseStrictFloat(rawValue, value)) return;
+  printConsoleLine("uno", key + "=" + String(value, 2));
 
   if (key == "PH") {
     unoTelemetry.phValue = value;
@@ -478,6 +596,7 @@ void acquireSensors() {
   sampleCount++;
 
   refreshSensorStatusSummary();
+  printConsoleJson("sensor_snapshot", buildSnapshotJson());
 }
 
 String buildSnapshotJson() {
@@ -544,6 +663,7 @@ bool connectMqtt() {
 
   String onlinePayload = buildStatusJson("online");
   mqttClient.publish(mqttStatusTopic.c_str(), onlinePayload.c_str(), true);
+  printConsoleJson("mqtt_status_publish", onlinePayload);
   Serial.println("[MQTT] connected");
   return true;
 }
@@ -562,14 +682,18 @@ void publishMqttSnapshot() {
 
   String payload = buildSnapshotJson();
   mqttClient.publish(mqttTopicLive.c_str(), payload.c_str(), false);
+  printConsoleJson("mqtt_live_publish", payload);
 }
 
 void broadcastSnapshot() {
   String payload = buildSnapshotJson();
   wsServer.broadcastTXT(payload);
+  printConsoleJson("websocket_broadcast", payload);
 }
 
 void logEvent(const String &level, const String &event, const String &detail) {
+  printConsoleLine("event", level + "/" + event + " - " + detail);
+
   FirebaseJson content;
   if (!setTimestampField(content, "fields/ts/timestampValue")) return;
   content.set("fields/level/stringValue", level);
@@ -622,6 +746,8 @@ void setDeviceFields(FirebaseJson &content) {
 }
 
 void updateDeviceStatus(bool online) {
+  printConsoleLine("device_status", String(online ? "online" : "offline") + " " + buildSnapshotJson());
+
   FirebaseJson content;
   setDeviceFields(content);
   content.set("fields/online/booleanValue", online);
@@ -639,6 +765,8 @@ void updateDeviceStatus(bool online) {
 }
 
 void writeReadingSnapshot() {
+  printConsoleJson("history_snapshot", buildSnapshotJson());
+
   FirebaseJson content;
   if (!setTimestampField(content, "fields/ts/timestampValue")) return;
   content.set("fields/temperatureC/doubleValue", temperatureC);
@@ -740,6 +868,7 @@ void finalizeFeederPulse() {
   feederPulseActive = false;
   feederPulseEndMs = 0;
   applyRelayState("fish_feeder", false);
+  printConsoleLine("feeder_pulse", "completed");
   logEvent("info", "feeder_servo_completed", "fish_feeder servo returned to idle");
   updateDeviceStatus(true);
   broadcastSnapshot();
@@ -774,6 +903,12 @@ void executeCommand(
     "Executing command: %s -> %s\n",
     type.c_str(),
     hasTargetState ? (targetState ? "true" : "false") : "n/a"
+  );
+  printConsoleLine(
+    "command",
+    String("type=") + type +
+      ", targetState=" + (hasTargetState ? (targetState ? "true" : "false") : "n/a") +
+      ", durationMs=" + (hasDurationMs ? String(durationMs) : "n/a")
   );
 
   bool ok = false;
@@ -969,6 +1104,7 @@ void onWsEvent(uint8_t clientNum, WStype_t type, uint8_t *payload, size_t length
   if (type == WStype_CONNECTED) {
     String payloadStr = buildSnapshotJson();
     wsServer.sendTXT(clientNum, payloadStr);
+    printConsoleJson("websocket_client_send", payloadStr);
   }
 }
 
@@ -998,13 +1134,7 @@ void setup() {
 
   waterTempSensor.begin();
 
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  Serial.print("WiFi connecting");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("\nWiFi connected");
+  connectWifi();
 
   mqttTopicLive = "plantation/" + String(deviceId) + "/telemetry/live";
   mqttStatusTopic = "plantation/" + String(deviceId) + "/status";
