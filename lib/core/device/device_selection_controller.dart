@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+const Duration kDeviceOfflineAfter = Duration(seconds: 12);
+
 class DeviceSummary {
   final String id;
   final String name;
@@ -23,6 +25,7 @@ class DeviceSelectionController extends ChangeNotifier {
   final FirebaseAuth? _auth;
   StreamSubscription<User?>? _authSub;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _deviceSub;
+  Timer? _staleTimer;
   int _streamGeneration = 0;
   bool _isSignedIn = false;
 
@@ -100,20 +103,28 @@ class DeviceSelectionController extends ChangeNotifier {
             _onError(error, stackTrace);
           },
         );
+    _staleTimer?.cancel();
+    _staleTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      _refreshStaleDevices();
+    });
   }
 
   void _stopDeviceStream() {
     _deviceSub?.cancel();
     _deviceSub = null;
+    _staleTimer?.cancel();
+    _staleTimer = null;
   }
 
   void _onSnapshot(QuerySnapshot<Map<String, dynamic>> snapshot) {
+    final now = DateTime.now();
     final parsed = snapshot.docs.map((doc) {
       final data = doc.data();
       final name = (data['name'] ?? doc.id).toString();
-      final online = (data['online'] ?? false) == true;
       final ts = data['lastSeen'];
       final lastSeen = ts is Timestamp ? ts.toDate() : null;
+      final online =
+          (data['online'] ?? false) == true && _isRecentlySeen(lastSeen, now);
       return DeviceSummary(
         id: doc.id,
         name: name,
@@ -123,6 +134,30 @@ class DeviceSelectionController extends ChangeNotifier {
     }).toList();
 
     _applyDevices(parsed);
+  }
+
+  bool _isRecentlySeen(DateTime? lastSeen, [DateTime? now]) {
+    if (lastSeen == null) return false;
+    return (now ?? DateTime.now()).difference(lastSeen) <= kDeviceOfflineAfter;
+  }
+
+  void _refreshStaleDevices() {
+    var changed = false;
+    final refreshed = _devices.map((device) {
+      if (!device.online || _isRecentlySeen(device.lastSeen)) {
+        return device;
+      }
+      changed = true;
+      return DeviceSummary(
+        id: device.id,
+        name: device.name,
+        online: false,
+        lastSeen: device.lastSeen,
+      );
+    }).toList();
+
+    if (!changed) return;
+    _applyDevices(refreshed);
   }
 
   void _applyDevices(List<DeviceSummary> parsed) {

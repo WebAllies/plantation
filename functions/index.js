@@ -28,6 +28,8 @@ const ALERT_RETENTION_DAYS = 3;
 const ALERT_CLEANUP_BATCH_SIZE = 300;
 const DEVICE_RECOMPUTE_BATCH_SIZE = 200;
 const FEEDER_SCAN_BATCH_SIZE = 200;
+const DEVICE_OFFLINE_AFTER_MS = 12 * 1000;
+const STALE_DEVICE_SCAN_BATCH_SIZE = 200;
 
 const AUTOMATION_USER_UID = 'system_automation';
 const AUTOMATION_USER_EMAIL = 'automation@system.local';
@@ -850,6 +852,65 @@ exports.cleanupOldAlerts = onSchedule(
     }
 
     console.log(`cleanupOldAlerts deleted ${totalDeleted} docs`);
+  },
+);
+
+exports.markStaleDevicesOffline = onSchedule(
+  {
+    schedule: 'every 1 minutes',
+    timeZone: 'Etc/UTC',
+  },
+  async () => {
+    const db = admin.firestore();
+    const nowMs = Date.now();
+    let lastDocId = null;
+    let markedOffline = 0;
+
+    while (true) {
+      let query = db
+        .collection('devices')
+        .where('online', '==', true)
+        .orderBy(admin.firestore.FieldPath.documentId())
+        .limit(STALE_DEVICE_SCAN_BATCH_SIZE);
+
+      if (lastDocId != null) {
+        query = query.startAfter(lastDocId);
+      }
+
+      const snapshot = await query.get();
+      if (snapshot.empty) break;
+
+      const batch = db.batch();
+      let writes = 0;
+
+      for (const doc of snapshot.docs) {
+        const data = doc.data() || {};
+        const lastSeen = asDate(data.lastSeen);
+        const ageMs = lastSeen ? nowMs - lastSeen.getTime() : Number.POSITIVE_INFINITY;
+        if (ageMs <= DEVICE_OFFLINE_AFTER_MS) continue;
+
+        batch.set(
+          doc.ref,
+          {
+            online: false,
+            espStatus: 'offline',
+            offlineDetectedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+        writes += 1;
+      }
+
+      if (writes > 0) {
+        await batch.commit();
+        markedOffline += writes;
+      }
+
+      lastDocId = snapshot.docs[snapshot.docs.length - 1].id;
+      if (snapshot.size < STALE_DEVICE_SCAN_BATCH_SIZE) break;
+    }
+
+    console.log(`markStaleDevicesOffline marked devices=${markedOffline}`);
   },
 );
 

@@ -27,6 +27,7 @@ class _ControlPageState extends State<ControlPage> {
   int _maxFillSec = 120;
 
   bool _hydratedFromFirestore = false;
+  static const int _feederRotations = 2;
 
   Future<void> _sendCommand({
     required String deviceId,
@@ -126,9 +127,7 @@ class _ControlPageState extends State<ControlPage> {
     });
   }
 
-  Future<void> _saveAutomationSettings({
-    required String deviceId,
-  }) async {
+  Future<void> _saveAutomationSettings({required String deviceId}) async {
     final times = _feedTimes.take(_feedCount).map(_fmt).toList();
 
     await FirebaseFirestore.instance.collection('devices').doc(deviceId).set({
@@ -140,7 +139,7 @@ class _ControlPageState extends State<ControlPage> {
         'waterLevelLowPct': _waterLevelLowPct,
         'maxFillSec': _maxFillSec,
         'updatedAt': FieldValue.serverTimestamp(),
-      }
+      },
     }, SetOptions(merge: true));
 
     if (!mounted) return;
@@ -167,8 +166,9 @@ class _ControlPageState extends State<ControlPage> {
       );
     }
 
-    final devRef =
-        FirebaseFirestore.instance.collection('devices').doc(deviceId);
+    final devRef = FirebaseFirestore.instance
+        .collection('devices')
+        .doc(deviceId);
 
     return Scaffold(
       appBar: AppBar(
@@ -198,7 +198,8 @@ class _ControlPageState extends State<ControlPage> {
           final feederState = relayStates['fishFeeder'] == true;
 
           // New fields
-          final controlMode = (d['controlMode'] ?? 'manual').toString(); // manual/auto
+          final controlMode = (d['controlMode'] ?? 'manual')
+              .toString(); // manual/auto
           final isAuto = controlMode == 'auto';
 
           // Telemetry (your simulator has it)
@@ -229,7 +230,9 @@ class _ControlPageState extends State<ControlPage> {
                 if (parts.length == 2) {
                   final hh = int.tryParse(parts[0]) ?? 8;
                   final mm = int.tryParse(parts[1]) ?? 0;
-                  parsed.add(TimeOfDay(hour: hh.clamp(0, 23), minute: mm.clamp(0, 59)));
+                  parsed.add(
+                    TimeOfDay(hour: hh.clamp(0, 23), minute: mm.clamp(0, 59)),
+                  );
                 }
               }
               if (parsed.isNotEmpty) {
@@ -247,8 +250,9 @@ class _ControlPageState extends State<ControlPage> {
           }
 
           final lowThreshold = _waterLevelLowPct.toDouble();
-          final isWaterLow =
-              waterLevelPct != null ? (waterLevelPct <= lowThreshold) : false;
+          final isWaterLow = waterLevelPct != null
+              ? (waterLevelPct <= lowThreshold)
+              : false;
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -257,9 +261,11 @@ class _ControlPageState extends State<ControlPage> {
               Card(
                 child: SwitchListTile(
                   title: const Text("Full Control Automation"),
-                  subtitle: Text(isAuto
-                      ? "AUTO mode (Firebase drives relay commands)"
-                      : "MANUAL mode (you control relays)"),
+                  subtitle: Text(
+                    isAuto
+                        ? "AUTO mode (Firebase drives relay commands)"
+                        : "MANUAL mode (you control relays)",
+                  ),
                   value: isAuto,
                   onChanged: (v) => _setControlMode(
                     deviceId: deviceId,
@@ -277,8 +283,8 @@ class _ControlPageState extends State<ControlPage> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       color: isWaterLow
-                          ? Colors.red.withOpacity(0.12)
-                          : Colors.green.withOpacity(0.10),
+                          ? Colors.red.withValues(alpha: 0.12)
+                          : Colors.green.withValues(alpha: 0.10),
                       border: Border.all(
                         color: isWaterLow ? Colors.red : Colors.green,
                         width: 0.8,
@@ -306,15 +312,98 @@ class _ControlPageState extends State<ControlPage> {
 
               const SizedBox(height: 12),
 
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 46,
+                            height: 46,
+                            decoration: BoxDecoration(
+                              color: feederState
+                                  ? Colors.orange.withValues(alpha: 0.16)
+                                  : Theme.of(context).colorScheme.primary
+                                        .withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.restaurant,
+                              color: feederState
+                                  ? Colors.orange.shade800
+                                  : Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  "Fish Feeder",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  feederState
+                                      ? "Dispensing food"
+                                      : "$_feederRotations full rotations ready",
+                                  style: TextStyle(color: Colors.grey.shade700),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Chip(
+                            avatar: Icon(
+                              feederState
+                                  ? Icons.autorenew
+                                  : Icons.check_circle_outline,
+                              size: 18,
+                            ),
+                            label: Text(feederState ? "Running" : "Ready"),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: feederState
+                              ? null
+                              : () => _sendCommand(
+                                  deviceId: deviceId,
+                                  type: 'fish_feeder',
+                                ),
+                          icon: const Icon(Icons.play_arrow),
+                          label: Text(
+                            feederState
+                                ? "Feeder running"
+                                : "Feed now ($_feederRotations full rotations)",
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
               // ===== Manual Controls =====
               Card(
                 child: Column(
                   children: [
                     ListTile(
                       title: const Text("Manual Controls"),
-                      subtitle: Text(isAuto
-                          ? "Disabled (Automation is active)"
-                          : "Enabled"),
+                      subtitle: Text(
+                        isAuto ? "Disabled (Automation is active)" : "Enabled",
+                      ),
                       trailing: Icon(isAuto ? Icons.lock : Icons.tune),
                     ),
                     const Divider(height: 1),
@@ -326,10 +415,10 @@ class _ControlPageState extends State<ControlPage> {
                       onChanged: isAuto
                           ? null
                           : (v) => _sendCommand(
-                                deviceId: deviceId,
-                                type: 'fish_to_filter',
-                                targetState: v,
-                              ),
+                              deviceId: deviceId,
+                              type: 'fish_to_filter',
+                              targetState: v,
+                            ),
                     ),
 
                     SwitchListTile(
@@ -339,10 +428,10 @@ class _ControlPageState extends State<ControlPage> {
                       onChanged: isAuto
                           ? null
                           : (v) => _sendCommand(
-                                deviceId: deviceId,
-                                type: 'ph_up',
-                                targetState: v,
-                              ),
+                              deviceId: deviceId,
+                              type: 'ph_up',
+                              targetState: v,
+                            ),
                     ),
                     SwitchListTile(
                       title: const Text("pH Down Relay"),
@@ -351,10 +440,10 @@ class _ControlPageState extends State<ControlPage> {
                       onChanged: isAuto
                           ? null
                           : (v) => _sendCommand(
-                                deviceId: deviceId,
-                                type: 'ph_down',
-                                targetState: v,
-                              ),
+                              deviceId: deviceId,
+                              type: 'ph_down',
+                              targetState: v,
+                            ),
                     ),
                     SwitchListTile(
                       title: const Text("Nutrient Relay"),
@@ -363,30 +452,10 @@ class _ControlPageState extends State<ControlPage> {
                       onChanged: isAuto
                           ? null
                           : (v) => _sendCommand(
-                                deviceId: deviceId,
-                                type: 'nutrient',
-                                targetState: v,
-                              ),
-                    ),
-
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () => _sendCommand(
-                            deviceId: deviceId,
-                            type: 'fish_feeder',
-                            durationSec: _feedDurationSec,
-                          ),
-                          icon: const Icon(Icons.restaurant),
-                          label: Text(
-                            feederState
-                                ? "Feeder running..."
-                                : "Feed now (${_feedDurationSec}s)",
-                          ),
-                        ),
-                      ),
+                              deviceId: deviceId,
+                              type: 'nutrient',
+                              targetState: v,
+                            ),
                     ),
                   ],
                 ),
@@ -450,39 +519,13 @@ class _ControlPageState extends State<ControlPage> {
                         );
                       }),
 
-                      const SizedBox(height: 8),
-
-                      Row(
-                        children: [
-                          const Expanded(child: Text("Valve open duration (sec)")),
-                          IconButton(
-                            onPressed: () => setState(() {
-                              _feedDurationSec = (_feedDurationSec - 1).clamp(1, 120);
-                            }),
-                            icon: const Icon(Icons.remove_circle_outline),
-                          ),
-                          Text(
-                            "$_feedDurationSec",
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () => setState(() {
-                              _feedDurationSec = (_feedDurationSec + 1).clamp(1, 120);
-                            }),
-                            icon: const Icon(Icons.add_circle_outline),
-                          ),
-                        ],
-                      ),
-
                       const SizedBox(height: 10),
 
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: () => _saveAutomationSettings(deviceId: deviceId),
+                          onPressed: () =>
+                              _saveAutomationSettings(deviceId: deviceId),
                           icon: const Icon(Icons.save),
                           label: const Text("Save schedule"),
                         ),
@@ -526,20 +569,31 @@ class _ControlPageState extends State<ControlPage> {
 
                       Row(
                         children: [
-                          const Expanded(child: Text("Low water threshold (%)")),
+                          const Expanded(
+                            child: Text("Low water threshold (%)"),
+                          ),
                           IconButton(
                             onPressed: () => setState(() {
-                              _waterLevelLowPct = (_waterLevelLowPct - 1).clamp(1, 100);
+                              _waterLevelLowPct = (_waterLevelLowPct - 1).clamp(
+                                1,
+                                100,
+                              );
                             }),
                             icon: const Icon(Icons.remove_circle_outline),
                           ),
                           Text(
                             "$_waterLevelLowPct",
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
                           ),
                           IconButton(
                             onPressed: () => setState(() {
-                              _waterLevelLowPct = (_waterLevelLowPct + 1).clamp(1, 100);
+                              _waterLevelLowPct = (_waterLevelLowPct + 1).clamp(
+                                1,
+                                100,
+                              );
                             }),
                             icon: const Icon(Icons.add_circle_outline),
                           ),
@@ -559,7 +613,10 @@ class _ControlPageState extends State<ControlPage> {
                           ),
                           Text(
                             "$_maxFillSec",
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
                           ),
                           IconButton(
                             onPressed: () => setState(() {
@@ -575,7 +632,8 @@ class _ControlPageState extends State<ControlPage> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: () => _saveAutomationSettings(deviceId: deviceId),
+                          onPressed: () =>
+                              _saveAutomationSettings(deviceId: deviceId),
                           icon: const Icon(Icons.save),
                           label: const Text("Save auto-fill settings"),
                         ),

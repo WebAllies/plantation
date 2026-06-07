@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:iot_aqua_app/core/device/device_selector_header.dart';
+import 'package:iot_aqua_app/core/device/device_selection_controller.dart';
 import 'package:iot_aqua_app/core/realtime/mqtt_telemetry_service.dart';
 import 'package:iot_aqua_app/widgets/emergency_alert_watcher.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -199,6 +200,7 @@ class _DashboardPageState extends State<DashboardPage> {
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _socketSub;
   Timer? _reconnectTimer;
+  Timer? _staleUiTimer;
 
   StreamSubscription<Map<String, dynamic>>? _mqttFrameSub;
   StreamSubscription<MqttLiveStatus>? _mqttStatusSub;
@@ -226,11 +228,15 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     _bindAlertState(widget.selectedDeviceId);
+    _staleUiTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
     _reconnectTimer?.cancel();
+    _staleUiTimer?.cancel();
     _detachSocket();
     _mqttFrameSub?.cancel();
     _mqttStatusSub?.cancel();
@@ -470,8 +476,8 @@ class _DashboardPageState extends State<DashboardPage> {
         : rawTopic.trim();
     final normalizedStatusTopic =
         (rawStatusTopic == null || rawStatusTopic.trim().isEmpty)
-            ? null
-            : rawStatusTopic.trim();
+        ? null
+        : rawStatusTopic.trim();
 
     final matchesActive =
         normalizedTopic == _activeMqttTopic &&
@@ -782,6 +788,11 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  bool _isRecentlySeen(DateTime? seenAt) {
+    if (seenAt == null) return false;
+    return DateTime.now().difference(seenAt) <= kDeviceOfflineAfter;
+  }
+
   String _trendLabel(double? value, {double low = 0, double high = 0}) {
     if (value == null) return 'No Data';
     if (high != 0 && value > high) return 'Rising';
@@ -874,8 +885,10 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
               const Spacer(),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: _trendBgColor(trend),
                   borderRadius: BorderRadius.circular(12),
@@ -972,10 +985,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 const SizedBox(height: 6),
                 Text(
                   subtitle,
-                  style: const TextStyle(
-                    color: Colors.black54,
-                    height: 1.4,
-                  ),
+                  style: const TextStyle(color: Colors.black54, height: 1.4),
                 ),
               ],
             ),
@@ -1020,6 +1030,9 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     final deviceId = widget.selectedDeviceId;
+    final liveRecentlySeen = _isRecentlySeen(_lastLiveAt);
+    final headerOnline =
+        _socketState == _SocketState.connected && liveRecentlySeen;
     if (deviceId == null) {
       return Scaffold(
         backgroundColor: const Color(0xFFF7F7F7),
@@ -1062,17 +1075,13 @@ class _DashboardPageState extends State<DashboardPage> {
                 children: [
                   Icon(
                     Icons.circle,
-                    color: _socketState == _SocketState.connected
+                    color: headerOnline
                         ? const Color(0xFF9BE59B)
                         : Colors.red.shade300,
                     size: 10,
                   ),
                   const SizedBox(width: 6),
-                  Text(
-                    _socketState == _SocketState.connected
-                        ? 'Online'
-                        : 'Offline',
-                  ),
+                  Text(headerOnline ? 'Online' : 'Offline'),
                 ],
               ),
             ),
@@ -1121,22 +1130,38 @@ class _DashboardPageState extends State<DashboardPage> {
               _queueWsUrlSync(wsUrl);
             }
 
-            final firestoreFrame = _TelemetryFrame.fromFirestore(
-              data,
-              fallback: _liveFrame,
-            );
-            final activeFrame = _liveFrame ?? firestoreFrame;
-
             final firestoreTs = data['lastSeen'];
             final firestoreSeen = firestoreTs is Timestamp
                 ? firestoreTs.toDate()
                 : null;
-            final relaySummary = activeFrame.relaySummary ??
+            final firestoreOnline =
+                (data['online'] ?? false) == true &&
+                _isRecentlySeen(firestoreSeen);
+            final liveFrame = liveRecentlySeen ? _liveFrame : null;
+            final effectiveLastSeen = liveRecentlySeen
+                ? _lastLiveAt
+                : firestoreSeen;
+            final firestoreFrame = _TelemetryFrame.fromFirestore(
+              data,
+              fallback: liveFrame,
+            );
+            final activeFrame = liveFrame ?? firestoreFrame;
+            final deviceOnline = liveRecentlySeen || firestoreOnline;
+            final relaySummary =
+                activeFrame.relaySummary ??
                 (activeFrame.relayStates.isEmpty
                     ? 'No relay state available'
                     : activeFrame.relayStates.entries
-                        .map((e) => '${e.key}: ${e.value ? "ON" : "OFF"}')
-                        .join('\n'));
+                          .map((e) => '${e.key}: ${e.value ? "ON" : "OFF"}')
+                          .join('\n'));
+            final fishToFilterOn =
+                activeFrame.relayStates['fishToFilter'] ??
+                activeFrame.relayStates['fish_to_filter'] ??
+                false;
+            final feederRunning =
+                activeFrame.relayStates['fishFeeder'] ??
+                activeFrame.relayStates['fish_feeder'] ??
+                false;
 
             final tempTrend = _trendLabel(
               activeFrame.temperatureC,
@@ -1154,6 +1179,18 @@ class _DashboardPageState extends State<DashboardPage> {
               low: 400,
               high: 1000,
             );
+            final phUpTankTrend = _trendLabel(
+              activeFrame.phUpTankLevelPct,
+              low: 20,
+            );
+            final phDownTankTrend = _trendLabel(
+              activeFrame.phDownTankLevelPct,
+              low: 20,
+            );
+            final nutrientTankTrend = _trendLabel(
+              activeFrame.nutrientTankLevelPct,
+              low: 20,
+            );
 
             return SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
@@ -1162,10 +1199,15 @@ class _DashboardPageState extends State<DashboardPage> {
                 children: [
                   _infoCard(
                     icon: Icons.wifi_tethering,
-                    iconColor: _stateColor(),
-                    title: 'Live Stream: ${_stateLabel()}',
+                    iconColor: deviceOnline
+                        ? _stateColor()
+                        : const Color(0xFFD84315),
+                    title:
+                        'Live Stream: ${deviceOnline ? _stateLabel() : 'Offline'}',
                     subtitle:
-                        'Transport: ${_transportLabel()}\n$_socketMessage',
+                        'Transport: ${_transportLabel()}\n'
+                        '${deviceOnline ? _socketMessage : 'No telemetry heartbeat from ESP32'}\n'
+                        'Last seen: ${effectiveLastSeen == null ? '--' : _timeFormatter.format(effectiveLastSeen)}',
                   ),
                   const SizedBox(height: 14),
                   _infoCard(
@@ -1230,7 +1272,46 @@ class _DashboardPageState extends State<DashboardPage> {
                         trend: tempTrend,
                         iconColor: const Color(0xFF2E7D32),
                       ),
+                      _dashboardMetricCard(
+                        icon: Icons.local_drink_outlined,
+                        title: 'pH Up Tank',
+                        value: _fmtDouble(activeFrame.phUpTankLevelPct, '%'),
+                        trend: phUpTankTrend,
+                        iconColor: const Color(0xFF1565C0),
+                      ),
+                      _dashboardMetricCard(
+                        icon: Icons.local_drink,
+                        title: 'pH Down Tank',
+                        value: _fmtDouble(activeFrame.phDownTankLevelPct, '%'),
+                        trend: phDownTankTrend,
+                        iconColor: const Color(0xFF6A1B9A),
+                      ),
+                      _dashboardMetricCard(
+                        icon: Icons.grass_outlined,
+                        title: 'Nutrient Tank',
+                        value: _fmtDouble(
+                          activeFrame.nutrientTankLevelPct,
+                          '%',
+                        ),
+                        trend: nutrientTankTrend,
+                        iconColor: const Color(0xFF558B2F),
+                      ),
                     ],
+                  ),
+
+                  const SizedBox(height: 18),
+                  _infoCard(
+                    icon: activeFrame.lastReadOk == false
+                        ? Icons.error_outline
+                        : Icons.sensors,
+                    iconColor: activeFrame.lastReadOk == false
+                        ? const Color(0xFFD84315)
+                        : const Color(0xFF2E7D32),
+                    title: 'Sensor Health',
+                    subtitle:
+                        'Status: ${activeFrame.sensorStatus ?? 'No status yet'}\n'
+                        'Samples: ${activeFrame.sampleCount?.toString() ?? '--'}\n'
+                        'Last read: ${activeFrame.lastReadOk == false ? 'Check sensors' : 'OK'}',
                   ),
 
                   const SizedBox(height: 18),
@@ -1271,16 +1352,25 @@ class _DashboardPageState extends State<DashboardPage> {
                       runSpacing: 10,
                       children: [
                         _statusChip(
-                          icon: pumpOn ? Icons.flash_on : Icons.flash_off,
-                          label: 'Pump: ${pumpOn ? 'ON' : 'OFF'}',
-                          active: pumpOn,
+                          icon: deviceOnline ? Icons.wifi : Icons.wifi_off,
+                          label: 'ESP: ${deviceOnline ? 'ONLINE' : 'OFFLINE'}',
+                          active: deviceOnline,
                         ),
                         _statusChip(
-                          icon: valveOpen
-                              ? Icons.settings_input_component
-                              : Icons.block,
-                          label: 'Valve: ${valveOpen ? 'OPEN' : 'CLOSED'}',
-                          active: valveOpen,
+                          icon: fishToFilterOn
+                              ? Icons.water_drop
+                              : Icons.water_drop_outlined,
+                          label:
+                              'Fish to filter: ${fishToFilterOn ? 'ON' : 'OFF'}',
+                          active: fishToFilterOn,
+                        ),
+                        _statusChip(
+                          icon: feederRunning
+                              ? Icons.restaurant
+                              : Icons.restaurant_outlined,
+                          label:
+                              'Feeder: ${feederRunning ? 'RUNNING' : 'READY'}',
+                          active: feederRunning,
                         ),
                         _statusChip(
                           icon: Icons.network_check,
@@ -1294,10 +1384,10 @@ class _DashboardPageState extends State<DashboardPage> {
                   const SizedBox(height: 18),
                   _infoCard(
                     icon: Icons.update,
-                    title: 'Last Live Update',
-                    subtitle: _lastLiveAt == null
-                        ? 'No live messages yet'
-                        : _timeFormatter.format(_lastLiveAt!),
+                    title: 'Last Seen',
+                    subtitle: effectiveLastSeen == null
+                        ? 'No telemetry heartbeat yet'
+                        : _timeFormatter.format(effectiveLastSeen),
                   ),
 
                   if (_socketState != _SocketState.connected) ...[

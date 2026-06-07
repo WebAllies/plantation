@@ -16,6 +16,10 @@ This folder contains Firebase Cloud Functions (Gen2) for MQTT credential issuanc
   - Recomputes alerts for one device after override changes.
 - `cleanupOldAlerts` (scheduled)
   - Deletes old alert history docs.
+- `markStaleDevicesOffline` (scheduled)
+  - Marks devices offline when their `lastSeen` heartbeat becomes stale.
+- `dispatchFeedingSchedules` (scheduled)
+  - Creates fish feeder commands from device feeding schedules.
 
 Global options from code:
 - Region: `us-central1`
@@ -129,12 +133,17 @@ Write paths:
 - `devices/{deviceId}/alerts/{alertId}`
 - `devices/{deviceId}/automation/tds`
 - `devices/{deviceId}/commands/{commandId}`
+- `devices/{deviceId}`
 
 Expected telemetry fields in `devices/{deviceId}`:
 - `temperatureC`
 - `ph`
 - `waterLevelPct`
 - `tdsPpm`
+- `online`
+- `espStatus`
+- `lastSeen`
+- `heartbeatSeq`
 
 Optional monitoring-only telemetry fields that may also be present:
 - `phUpTankLevelPct`
@@ -143,8 +152,10 @@ Optional monitoring-only telemetry fields that may also be present:
 - `sensorStatus`
 - `lastReadOk`
 - `sampleCount`
+- `offlineDetectedAt`
 
 These extra fields are allowed on device documents and reading snapshots but are not part of the current alert evaluation logic.
+The app treats a device as live only while MQTT/WebSocket telemetry or the Firestore `lastSeen` heartbeat is recent. The scheduled Firebase job also sets `online: false` and `espStatus: offline` for stale devices so dashboards recover correctly after the ESP32 loses WiFi or power.
 
 ## Post-Deploy Verification
 1. Confirm deploy succeeded in Firebase Console -> Functions.
@@ -155,7 +166,7 @@ These extra fields are allowed on device documents and reading snapshots but are
    - `devices/{deviceId}/alerts/*`
 5. If low-TDS automation is enabled, verify command writes:
    - `devices/{deviceId}/commands/*`
-6. Confirm scheduled cleanup function exists and is enabled.
+6. Confirm scheduled cleanup, feeder dispatch, and stale-device functions exist and are enabled.
 
 ## Local Emulator (Optional)
 From `functions/`:

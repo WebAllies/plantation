@@ -21,7 +21,7 @@
 // -------------------- FIREBASE --------------------
 #define API_KEY "AIzaSyCKU-jSEXoftXGq9653hJql7YWXG7_Rtr8"
 #define FIREBASE_PROJECT_ID "iotaquaapp"
-#define USER_EMAIL "device@iot.com"
+#define USER_EMAIL "device@iot.com" 
 #define USER_PASSWORD "device12345"
 
 // -------------------- MQTT --------------------
@@ -43,10 +43,12 @@ const int RELAY_NUTRIENT_PIN = 21;
 const int RELAY_FISH_TO_FILTER_PIN = 22;
 const int FISH_FEEDER_SERVO_PIN = 23;
 const bool RELAY_ACTIVE_HIGH = true;
-const int FISH_FEEDER_SERVO_IDLE_DEG = 0;
-const int FISH_FEEDER_SERVO_ACTIVE_DEG = 90;
+const int FISH_FEEDER_SERVO_IDLE_DEG = 90;
+const int FISH_FEEDER_SERVO_ACTIVE_DEG = 180;
 const int FISH_FEEDER_SERVO_MIN_US = 500;
 const int FISH_FEEDER_SERVO_MAX_US = 2400;
+const int FISH_FEEDER_ROTATION_COUNT = 2;
+const unsigned long FISH_FEEDER_FULL_ROTATION_MS = 1000;
 
 // UART from optional Arduino Nano. Protect ESP32 RX from 5V Nano TX with a level shifter/divider.
 const bool USE_UNO_UART = true;
@@ -57,8 +59,8 @@ const unsigned long UNO_DATA_TIMEOUT_MS = 15000;
 
 // Sensor and sampling settings
 const unsigned long SENSOR_INTERVAL_MS = 1000;
-const unsigned long STATUS_INTERVAL_MS = 5000;
-const unsigned long CMD_POLL_INTERVAL_MS = 2000;
+const unsigned long STATUS_INTERVAL_MS = 2000;
+const unsigned long CMD_POLL_INTERVAL_MS = 700;
 const unsigned long HISTORY_INTERVAL_MS = 300000;
 const unsigned long MQTT_RECONNECT_INTERVAL_MS = 5000;
 const bool CONSOLE_OUTPUT_ENABLED = true;
@@ -602,6 +604,7 @@ void acquireSensors() {
 String buildSnapshotJson() {
   FirebaseJson js;
   js.set("deviceId", deviceId);
+  js.set("espStatus", "online");
   js.set("tsEpochMs", epochMillisString());
   js.set("temperatureC", temperatureC);
   js.set("ph", ph);
@@ -613,6 +616,7 @@ String buildSnapshotJson() {
   js.set("sensorStatus", sensorStatus);
   js.set("lastReadOk", lastReadOk);
   js.set("sampleCount", (int)sampleCount);
+  js.set("heartbeatSeq", (int)sampleCount);
   js.set("relayStates/phUp", relayPhUpState);
   js.set("relayStates/phDown", relayPhDownState);
   js.set("relayStates/nutrient", relayNutrientState);
@@ -714,6 +718,7 @@ void logEvent(const String &level, const String &event, const String &detail) {
 void setDeviceFields(FirebaseJson &content) {
   content.set("fields/name/stringValue", "Aquaponics ESP32");
   content.set("fields/online/booleanValue", true);
+  content.set("fields/espStatus/stringValue", "online");
   content.set("fields/rssi/integerValue", String(WiFi.RSSI()));
   content.set("fields/temperatureC/doubleValue", temperatureC);
   content.set("fields/ph/doubleValue", ph);
@@ -725,6 +730,7 @@ void setDeviceFields(FirebaseJson &content) {
   content.set("fields/sensorStatus/stringValue", sensorStatus);
   content.set("fields/lastReadOk/booleanValue", lastReadOk);
   content.set("fields/sampleCount/integerValue", String(sampleCount));
+  content.set("fields/heartbeatSeq/integerValue", String(sampleCount));
   content.set("fields/relayStates/mapValue/fields/phUp/booleanValue", relayPhUpState);
   content.set("fields/relayStates/mapValue/fields/phDown/booleanValue", relayPhDownState);
   content.set("fields/relayStates/mapValue/fields/nutrient/booleanValue", relayNutrientState);
@@ -751,6 +757,7 @@ void updateDeviceStatus(bool online) {
   FirebaseJson content;
   setDeviceFields(content);
   content.set("fields/online/booleanValue", online);
+  content.set("fields/espStatus/stringValue", online ? "online" : "offline");
   if (!setTimestampField(content, "fields/lastSeen/timestampValue")) return;
 
   bool patchOk = Firebase.Firestore.patchDocument(
@@ -759,7 +766,7 @@ void updateDeviceStatus(bool online) {
     "",
     deviceDocPath().c_str(),
     content.raw(),
-    "name,online,lastSeen,rssi,temperatureC,ph,waterLevelPct,tdsPpm,phUpTankLevelPct,phDownTankLevelPct,nutrientTankLevelPct,sensorStatus,lastReadOk,sampleCount,relayStates,relaySummary,wsUrl,realtimeTransport,mqttTopicLive,mqttStatusTopic,mqttEnabled,simulator"
+    "name,online,espStatus,lastSeen,rssi,temperatureC,ph,waterLevelPct,tdsPpm,phUpTankLevelPct,phDownTankLevelPct,nutrientTankLevelPct,sensorStatus,lastReadOk,sampleCount,heartbeatSeq,relayStates,relaySummary,wsUrl,realtimeTransport,mqttTopicLive,mqttStatusTopic,mqttEnabled,simulator"
   );
   printFirestoreResult("updateDeviceStatus", patchOk);
 }
@@ -868,8 +875,8 @@ void finalizeFeederPulse() {
   feederPulseActive = false;
   feederPulseEndMs = 0;
   applyRelayState("fish_feeder", false);
-  printConsoleLine("feeder_pulse", "completed");
-  logEvent("info", "feeder_servo_completed", "fish_feeder servo returned to idle");
+  printConsoleLine("feeder_pulse", "completed 2 full rotations");
+  logEvent("info", "feeder_servo_completed", "fish_feeder servo completed 2 full rotations");
   updateDeviceStatus(true);
   broadcastSnapshot();
   publishMqttSnapshot();
@@ -878,13 +885,21 @@ void finalizeFeederPulse() {
     patchCommandStatus(
       feederPulseCommandPath,
       "executed",
-      String("fish_feeder servo completed after ") + String(feederPulseDurationMs) + " ms",
+      String("fish_feeder servo completed ") + String(FISH_FEEDER_ROTATION_COUNT) + " full rotations",
       true
     );
   }
 
   feederPulseCommandPath = "";
   feederPulseDurationMs = 0;
+}
+
+void startFeederPulse(const String &docPath) {
+  applyRelayState("fish_feeder", true);
+  feederPulseActive = true;
+  feederPulseDurationMs = FISH_FEEDER_FULL_ROTATION_MS * FISH_FEEDER_ROTATION_COUNT;
+  feederPulseEndMs = millis() + feederPulseDurationMs;
+  feederPulseCommandPath = docPath;
 }
 
 void executeCommand(
@@ -931,22 +946,15 @@ void executeCommand(
       ok = true;
     }
   } else if (type == "fish_feeder") {
-    if (!hasDurationMs || durationMs == 0) {
-      msg = "durationMs is required for fish_feeder";
-      logEvent("warn", "command_failed", "fish_feeder missing durationMs");
-    } else if (feederPulseActive) {
+    if (feederPulseActive) {
       msg = "fish_feeder servo already active";
       logEvent("warn", "command_failed", msg);
     } else {
-      applyRelayState("fish_feeder", true);
-      feederPulseActive = true;
-      feederPulseDurationMs = durationMs;
-      feederPulseEndMs = millis() + durationMs;
-      feederPulseCommandPath = docPath;
+      startFeederPulse(docPath);
       logEvent(
         "info",
         "feeder_servo_started",
-        String("fish_feeder servo active for ") + String(durationMs) + " ms"
+        String("fish_feeder servo started ") + String(FISH_FEEDER_ROTATION_COUNT) + " full rotations"
       );
       updateDeviceStatus(true);
       broadcastSnapshot();
@@ -954,7 +962,7 @@ void executeCommand(
       patchCommandStatus(
         docPath,
         "executing",
-        String("fish_feeder servo active for ") + String(durationMs) + " ms",
+        String("fish_feeder servo running ") + String(FISH_FEEDER_ROTATION_COUNT) + " full rotations",
         false
       );
       return;

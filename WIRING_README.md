@@ -161,6 +161,7 @@ Check and tune in [uno_aquaponics](/mnt/e/shuaib/plantation/uno_aquaponics):
 
 ### Ultrasonic Tank Levels
 Check and tune in [uno_aquaponics](/mnt/e/shuaib/plantation/uno_aquaponics):
+- `TANK_HEIGHT_CM`
 - `FISH_TANK_EMPTY_DISTANCE_CM`
 - `FISH_TANK_FULL_DISTANCE_CM`
 - `PH_UP_EMPTY_DISTANCE_CM`
@@ -171,6 +172,7 @@ Check and tune in [uno_aquaponics](/mnt/e/shuaib/plantation/uno_aquaponics):
 - `NUTRIENT_FULL_DISTANCE_CM`
 
 Meaning:
+- `TANK_HEIGHT_CM` = real usable tank depth. Current firmware uses `10.0 cm`.
 - `EMPTY_DISTANCE_CM` = sensor is farther from the water surface
 - `FULL_DISTANCE_CM` = water is closer to the sensor
 
