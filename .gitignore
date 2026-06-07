@@ -50,6 +50,11 @@ functions/node_modules/
 functions/.env
 functions/.env.*
 
+# Local MQTT/PostgreSQL backend
+local_backend/node_modules/
+local_backend/.env
+local_backend/.env.*
+
 # ML workspace artifacts
 ml/.venv/
 ml/artifacts/

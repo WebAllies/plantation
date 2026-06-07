@@ -25,10 +25,11 @@
 #define USER_PASSWORD "device12345"
 
 // -------------------- MQTT --------------------
-#define MQTT_BROKER_HOST "9b2acde209524e8788afd4921fd6c347.s1.eu.hivemq.cloud"
-#define MQTT_BROKER_PORT 8883
-#define MQTT_USERNAME "plantation_app"
-#define MQTT_PASSWORD "Shuaib123"
+#define MQTT_BROKER_HOST "116.203.96.119"
+#define MQTT_BROKER_PORT 1883
+#define MQTT_USE_TLS 0
+#define MQTT_USERNAME ""
+#define MQTT_PASSWORD ""
 
 // -------------------- DEVICE --------------------
 #define DEVICE_ID "esp32_aquaponics_01"
@@ -98,14 +99,21 @@ bool relayFishFeederState = false;
 String wsUrl = "";
 String mqttTopicLive = "";
 String mqttStatusTopic = "";
+String mqttCommandTopic = "";
+String mqttCommandAckTopic = "";
 
 FirebaseData fbdo;
 FirebaseAuth auth;
 FirebaseConfig config;
 
 WebSocketsServer wsServer(WS_PORT);
+#if MQTT_USE_TLS
 WiFiClientSecure mqttSecureClient;
 PubSubClient mqttClient(mqttSecureClient);
+#else
+WiFiClient mqttPlainClient;
+PubSubClient mqttClient(mqttPlainClient);
+#endif
 HardwareSerial unoSerial(2);
 OneWire oneWire(TEMP_ONEWIRE_PIN);
 DallasTemperature waterTempSensor(&oneWire);
@@ -624,6 +632,10 @@ String buildSnapshotJson() {
   js.set("relayStates/fishFeeder", relayFishFeederState);
   js.set("relaySummary", relayStateSummary());
   js.set("rssi", WiFi.RSSI());
+  js.set("mqttTopicLive", mqttTopicLive);
+  js.set("mqttStatusTopic", mqttStatusTopic);
+  js.set("mqttCommandTopic", mqttCommandTopic);
+  js.set("mqttCommandAckTopic", mqttCommandAckTopic);
 
   String out;
   js.toString(out, false);
@@ -641,6 +653,52 @@ String buildStatusJson(const String &status) {
   return out;
 }
 
+String commandIdFromDocPath(const String &docPath) {
+  int slash = docPath.lastIndexOf('/');
+  if (slash < 0 || slash >= (int)docPath.length() - 1) return docPath;
+  return docPath.substring(slash + 1);
+}
+
+void publishMqttCommandAck(const String &commandId, const String &status, const String &message) {
+  if (!mqttClient.connected()) return;
+  if (mqttCommandAckTopic.length() == 0 || commandId.length() == 0) return;
+
+  FirebaseJson js;
+  js.set("deviceId", deviceId);
+  js.set("id", commandId);
+  js.set("commandId", commandId);
+  js.set("status", status);
+  js.set("message", message);
+  js.set("tsEpochMs", epochMillisString());
+
+  String out;
+  js.toString(out, false);
+  mqttClient.publish(mqttCommandAckTopic.c_str(), out.c_str(), false);
+  printConsoleJson("mqtt_command_ack", out);
+}
+
+bool mqttConnectWithWill(const String &clientId, const String &willPayload) {
+  if (strlen(MQTT_USERNAME) > 0 || strlen(MQTT_PASSWORD) > 0) {
+    return mqttClient.connect(
+      clientId.c_str(),
+      MQTT_USERNAME,
+      MQTT_PASSWORD,
+      mqttStatusTopic.c_str(),
+      1,
+      true,
+      willPayload.c_str()
+    );
+  }
+
+  return mqttClient.connect(
+    clientId.c_str(),
+    mqttStatusTopic.c_str(),
+    1,
+    true,
+    willPayload.c_str()
+  );
+}
+
 bool connectMqtt() {
   if (mqttClient.connected()) return true;
 
@@ -650,19 +708,18 @@ bool connectMqtt() {
 
   String clientId = String("esp32-aqua-") + deviceId + "-" + String(esp_random(), HEX);
   String willPayload = buildStatusJson("offline");
-  bool ok = mqttClient.connect(
-    clientId.c_str(),
-    MQTT_USERNAME,
-    MQTT_PASSWORD,
-    mqttStatusTopic.c_str(),
-    1,
-    true,
-    willPayload.c_str()
-  );
+  bool ok = mqttConnectWithWill(clientId, willPayload);
 
   if (!ok) {
     Serial.printf("[MQTT] connect failed (state=%d)\n", mqttClient.state());
     return false;
+  }
+
+  if (mqttCommandTopic.length() > 0) {
+    bool subscribed = mqttClient.subscribe(mqttCommandTopic.c_str(), 1);
+    Serial.printf("[MQTT] command subscribe %s: %s\n",
+                  mqttCommandTopic.c_str(),
+                  subscribed ? "ok" : "failed");
   }
 
   String onlinePayload = buildStatusJson("online");
@@ -747,6 +804,8 @@ void setDeviceFields(FirebaseJson &content) {
   content.set("fields/realtimeTransport/stringValue", "mqtt");
   content.set("fields/mqttTopicLive/stringValue", mqttTopicLive);
   content.set("fields/mqttStatusTopic/stringValue", mqttStatusTopic);
+  content.set("fields/mqttCommandTopic/stringValue", mqttCommandTopic);
+  content.set("fields/mqttCommandAckTopic/stringValue", mqttCommandAckTopic);
   content.set("fields/mqttEnabled/booleanValue", true);
   content.set("fields/simulator/booleanValue", false);
 }
@@ -766,7 +825,7 @@ void updateDeviceStatus(bool online) {
     "",
     deviceDocPath().c_str(),
     content.raw(),
-    "name,online,espStatus,lastSeen,rssi,temperatureC,ph,waterLevelPct,tdsPpm,phUpTankLevelPct,phDownTankLevelPct,nutrientTankLevelPct,sensorStatus,lastReadOk,sampleCount,heartbeatSeq,relayStates,relaySummary,wsUrl,realtimeTransport,mqttTopicLive,mqttStatusTopic,mqttEnabled,simulator"
+    "name,online,espStatus,lastSeen,rssi,temperatureC,ph,waterLevelPct,tdsPpm,phUpTankLevelPct,phDownTankLevelPct,nutrientTankLevelPct,sensorStatus,lastReadOk,sampleCount,heartbeatSeq,relayStates,relaySummary,wsUrl,realtimeTransport,mqttTopicLive,mqttStatusTopic,mqttCommandTopic,mqttCommandAckTopic,mqttEnabled,simulator"
   );
   printFirestoreResult("updateDeviceStatus", patchOk);
 }
@@ -866,6 +925,7 @@ bool patchCommandStatus(
     updateMask.c_str()
   );
   printFirestoreResult("patchCommandStatus", patchOk);
+  publishMqttCommandAck(commandIdFromDocPath(docPath), status, message);
   return patchOk;
 }
 
@@ -1099,6 +1159,84 @@ void pollLatestPendingCommand() {
   );
 }
 
+void onMqttMessage(char *topic, byte *payload, unsigned int length) {
+  String topicStr(topic);
+  if (topicStr != mqttCommandTopic) return;
+
+  String payloadStr;
+  payloadStr.reserve(length + 1);
+  for (unsigned int i = 0; i < length; i++) {
+    payloadStr += (char)payload[i];
+  }
+  printConsoleJson("mqtt_command_received", payloadStr);
+
+  FirebaseJson js;
+  js.setJsonData(payloadStr);
+
+  FirebaseJsonData idData;
+  FirebaseJsonData commandIdData;
+  FirebaseJsonData typeData;
+  FirebaseJsonData targetData;
+  FirebaseJsonData durationMsData;
+  FirebaseJsonData durationSecData;
+
+  js.get(idData, "id");
+  js.get(commandIdData, "commandId");
+  js.get(typeData, "type");
+  js.get(targetData, "targetState");
+  js.get(durationMsData, "durationMs");
+  js.get(durationSecData, "durationSec");
+
+  if (!typeData.success || typeData.stringValue.length() == 0) {
+    publishMqttCommandAck("unknown", "failed", "MQTT command missing type");
+    return;
+  }
+
+  String commandId = idData.success ? idData.stringValue : "";
+  if (commandId.length() == 0 && commandIdData.success) {
+    commandId = commandIdData.stringValue;
+  }
+  if (commandId.length() == 0) {
+    commandId = String("mqtt-") + String(millis());
+  }
+
+  bool hasTargetState = targetData.success;
+  bool targetState = hasTargetState ? targetData.boolValue : false;
+  bool hasDurationMs = false;
+  unsigned long durationMs = 0;
+
+  if (durationMsData.success) {
+    if (durationMsData.type == "int" || durationMsData.type == "integer") {
+      durationMs = (unsigned long)strtoull(durationMsData.stringValue.c_str(), nullptr, 10);
+    } else {
+      durationMs = (unsigned long)durationMsData.doubleValue;
+    }
+    hasDurationMs = durationMs > 0;
+  } else if (durationSecData.success) {
+    if (durationSecData.type == "int" || durationSecData.type == "integer") {
+      durationMs = (unsigned long)strtoull(durationSecData.stringValue.c_str(), nullptr, 10) * 1000UL;
+    } else {
+      durationMs = (unsigned long)(durationSecData.doubleValue * 1000.0);
+    }
+    hasDurationMs = durationMs > 0;
+  }
+
+  String docFullName =
+    String("projects/local/databases/(default)/documents/devices/") +
+    deviceId +
+    "/commands/" +
+    commandId;
+
+  executeCommand(
+    docFullName,
+    typeData.stringValue,
+    hasTargetState,
+    targetState,
+    hasDurationMs,
+    durationMs
+  );
+}
+
 void processFeederPulse() {
   if (!feederPulseActive) return;
   if ((long)(millis() - feederPulseEndMs) < 0) return;
@@ -1146,16 +1284,23 @@ void setup() {
 
   mqttTopicLive = "plantation/" + String(deviceId) + "/telemetry/live";
   mqttStatusTopic = "plantation/" + String(deviceId) + "/status";
+  mqttCommandTopic = "plantation/" + String(deviceId) + "/commands";
+  mqttCommandAckTopic = "plantation/" + String(deviceId) + "/commands/ack";
   wsUrl = "ws://" + WiFi.localIP().toString() + ":" + String(WS_PORT);
   Serial.println("WebSocket endpoint: " + wsUrl);
   Serial.println("MQTT live topic: " + mqttTopicLive);
   Serial.println("MQTT status topic: " + mqttStatusTopic);
+  Serial.println("MQTT command topic: " + mqttCommandTopic);
+  Serial.println("MQTT command ack topic: " + mqttCommandAckTopic);
 
   wsServer.begin();
   wsServer.onEvent(onWsEvent);
 
+#if MQTT_USE_TLS
   mqttSecureClient.setInsecure();
+#endif
   mqttClient.setServer(MQTT_BROKER_HOST, MQTT_BROKER_PORT);
+  mqttClient.setCallback(onMqttMessage);
   mqttClient.setKeepAlive(20);
   mqttClient.setBufferSize(1536);
   connectMqtt();

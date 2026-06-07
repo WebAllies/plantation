@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:iot_aqua_app/core/device/device_selector_header.dart';
+import 'package:iot_aqua_app/core/local/local_backend_command_service.dart';
 
 class ControlPage extends StatefulWidget {
   const ControlPage({super.key, required this.selectedDeviceId});
@@ -15,6 +16,8 @@ class ControlPage extends StatefulWidget {
 }
 
 class _ControlPageState extends State<ControlPage> {
+  final LocalBackendCommandService _localBackend = LocalBackendCommandService();
+
   // Local UI state for schedule editing
   int _feedCount = 1; // 1/2/3 times per day
   List<TimeOfDay> _feedTimes = [const TimeOfDay(hour: 8, minute: 0)];
@@ -35,6 +38,20 @@ class _ControlPageState extends State<ControlPage> {
     bool? targetState,
     int? durationSec,
   }) async {
+    final sentLocal = await _localBackend.sendCommand(
+      deviceId: deviceId,
+      type: type,
+      targetState: targetState,
+      durationSec: durationSec,
+    );
+    if (sentLocal) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("${type.toUpperCase()} queued locally")),
+      );
+      return;
+    }
+
     final user = FirebaseAuth.instance.currentUser;
     final uid = user?.uid ?? "";
     final email = user?.email ?? "";
@@ -91,6 +108,22 @@ class _ControlPageState extends State<ControlPage> {
     required String deviceId,
     required String mode, // "manual" or "auto"
   }) async {
+    final sentLocal = await _localBackend.patchDevice(
+      deviceId: deviceId,
+      controlMode: mode,
+    );
+    if (sentLocal) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "Automation mode queued locally: ${mode.toUpperCase()}",
+          ),
+        ),
+      );
+      return;
+    }
+
     await FirebaseFirestore.instance.collection('devices').doc(deviceId).set({
       'controlMode': mode,
       'controlModeUpdatedAt': FieldValue.serverTimestamp(),
@@ -129,17 +162,29 @@ class _ControlPageState extends State<ControlPage> {
 
   Future<void> _saveAutomationSettings({required String deviceId}) async {
     final times = _feedTimes.take(_feedCount).map(_fmt).toList();
+    final automation = <String, dynamic>{
+      'feedingEnabled': _feedingEnabled,
+      'feedingTimes': times,
+      'feedingDurationSec': _feedDurationSec,
+      'autoFillEnabled': _autoFillEnabled,
+      'waterLevelLowPct': _waterLevelLowPct,
+      'maxFillSec': _maxFillSec,
+    };
+
+    final sentLocal = await _localBackend.patchDevice(
+      deviceId: deviceId,
+      automation: automation,
+    );
+    if (sentLocal) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Automation settings queued locally")),
+      );
+      return;
+    }
 
     await FirebaseFirestore.instance.collection('devices').doc(deviceId).set({
-      'automation': {
-        'feedingEnabled': _feedingEnabled,
-        'feedingTimes': times,
-        'feedingDurationSec': _feedDurationSec,
-        'autoFillEnabled': _autoFillEnabled,
-        'waterLevelLowPct': _waterLevelLowPct,
-        'maxFillSec': _maxFillSec,
-        'updatedAt': FieldValue.serverTimestamp(),
-      },
+      'automation': {...automation, 'updatedAt': FieldValue.serverTimestamp()},
     }, SetOptions(merge: true));
 
     if (!mounted) return;

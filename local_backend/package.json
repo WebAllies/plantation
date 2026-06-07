@@ -1,0 +1,21 @@
+{
+  "name": "plantation-local-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first MQTT, PostgreSQL, WebSocket, and Firebase backup backend for the aquaponics app.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "migrate": "node src/migrate.js",
+    "check": "node --check src/index.js && node --check src/db.js && node --check src/http_api.js && node --check src/mqtt_broker.js && node --check src/ws_hub.js && node --check src/firebase_backup.js && node --check src/auth.js && node --check src/config.js"
+  },
+  "dependencies": {
+    "aedes": "^0.51.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "firebase-admin": "^12.7.0",
+    "pg": "^8.13.1",
+    "ws": "^8.18.0"
+  }
+}

@@ -2,17 +2,19 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:iot_aqua_app/core/device/device_selector_header.dart';
 import 'package:iot_aqua_app/core/device/device_selection_controller.dart';
+import 'package:iot_aqua_app/core/local/local_backend_config.dart';
 import 'package:iot_aqua_app/core/realtime/mqtt_telemetry_service.dart';
 import 'package:iot_aqua_app/widgets/emergency_alert_watcher.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 enum _SocketState { disconnected, connecting, connected, retrying }
 
-enum _LiveTransport { firestore, mqtt, websocketLegacy }
+enum _LiveTransport { firestore, mqtt, websocketLegacy, localBackend }
 
 class _TelemetryFrame {
   final String deviceId;
@@ -218,6 +220,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   String? _activeWsUrl;
   String? _queuedWsUrl;
+  _LiveTransport? _queuedWsTransport;
 
   String? _activeMqttTopic;
   String? _activeMqttStatusTopic;
@@ -258,6 +261,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
       _activeWsUrl = null;
       _queuedWsUrl = null;
+      _queuedWsTransport = null;
       _activeMqttTopic = null;
       _activeMqttStatusTopic = null;
       _queuedMqttTopic = null;
@@ -453,20 +457,28 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  void _queueWsUrlSync(String? rawWsUrl) {
+  void _queueWsUrlSync(
+    String? rawWsUrl, {
+    _LiveTransport transport = _LiveTransport.websocketLegacy,
+  }) {
     final normalized = (rawWsUrl == null || rawWsUrl.trim().isEmpty)
         ? null
         : rawWsUrl.trim();
 
-    if (normalized == _activeWsUrl || normalized == _queuedWsUrl) return;
+    if (normalized == _activeWsUrl && _activeTransport == transport) return;
+    if (normalized == _queuedWsUrl && _queuedWsTransport == transport) return;
     _queuedWsUrl = normalized;
+    _queuedWsTransport = transport;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final next = _queuedWsUrl;
+      final nextTransport =
+          _queuedWsTransport ?? _LiveTransport.websocketLegacy;
       _queuedWsUrl = null;
-      if (next == _activeWsUrl) return;
-      _switchSocket(next);
+      _queuedWsTransport = null;
+      if (next == _activeWsUrl && _activeTransport == nextTransport) return;
+      _switchSocket(next, transport: nextTransport);
     });
   }
 
@@ -566,7 +578,10 @@ class _DashboardPageState extends State<DashboardPage> {
     await _mqttService.disconnect();
   }
 
-  void _switchSocket(String? wsUrl) {
+  void _switchSocket(
+    String? wsUrl, {
+    _LiveTransport transport = _LiveTransport.websocketLegacy,
+  }) {
     _reconnectTimer?.cancel();
     unawaited(_detachMqtt());
     _detachSocket();
@@ -586,7 +601,7 @@ class _DashboardPageState extends State<DashboardPage> {
       setState(() {
         _activeWsUrl = wsUrl;
         _socketState = _SocketState.disconnected;
-        _activeTransport = _LiveTransport.websocketLegacy;
+        _activeTransport = transport;
         _socketMessage = 'Invalid wsUrl format: $wsUrl';
       });
       return;
@@ -594,14 +609,45 @@ class _DashboardPageState extends State<DashboardPage> {
 
     setState(() {
       _activeWsUrl = wsUrl;
-      _activeTransport = _LiveTransport.websocketLegacy;
+      _activeTransport = transport;
       _lastLiveTsMs = null;
       _socketState = _SocketState.connecting;
       _socketMessage = 'Connecting to $wsUrl';
     });
 
+    unawaited(_openChannel(wsUrl, uri, transport));
+  }
+
+  /// Opens the live WebSocket. For the local backend transport the Firebase ID
+  /// token is attached as a `token` query param so the server can authenticate
+  /// the connection. The token is never attached to legacy/third-party URLs.
+  Future<void> _openChannel(
+    String wsUrl,
+    Uri uri,
+    _LiveTransport transport,
+  ) async {
+    var connectUri = uri;
+    if (transport == _LiveTransport.localBackend &&
+        !uri.queryParameters.containsKey('token')) {
+      try {
+        final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+        if (token != null && token.isNotEmpty) {
+          connectUri = uri.replace(
+            queryParameters: {...uri.queryParameters, 'token': token},
+          );
+        }
+      } catch (_) {
+        // Fall back to an unauthenticated connection; the backend currently
+        // allows it (LOCAL_BACKEND_REQUIRE_AUTH=false).
+      }
+    }
+
+    // Guard against a newer switch having superseded this one while awaiting
+    // the token.
+    if (!mounted || _activeWsUrl != wsUrl) return;
+
     try {
-      final channel = WebSocketChannel.connect(uri);
+      final channel = WebSocketChannel.connect(connectUri);
       _channel = channel;
       _socketSub = channel.stream.listen(
         _onSocketData,
@@ -637,9 +683,48 @@ class _DashboardPageState extends State<DashboardPage> {
     } catch (_) {
       return;
     }
-    if (decoded is! Map<String, dynamic>) return;
+    if (decoded is! Map) return;
 
-    _applyLivePayload(decoded, sourceLabel: 'WebSocket');
+    final mapped = _toStringDynamicMap(decoded);
+    final type = mapped?['type']?.toString();
+    final wrappedPayload = _toStringDynamicMap(mapped?['payload']);
+
+    if (type == 'telemetry' && wrappedPayload != null) {
+      _applyLivePayload(wrappedPayload, sourceLabel: 'Local Backend');
+      return;
+    }
+
+    if (type == 'device_status' && wrappedPayload != null) {
+      final online = _TelemetryFrame._toBoolValue(wrappedPayload['online']);
+      if (!mounted || online == null) return;
+      setState(() {
+        _socketState = online
+            ? _SocketState.connected
+            : _SocketState.disconnected;
+        _socketMessage = online
+            ? 'Local backend heartbeat active'
+            : 'Local backend marked ESP offline';
+        if (online) _lastLiveAt = DateTime.now();
+      });
+      return;
+    }
+
+    if (type == 'hello' || type == 'command' || type == 'device_patch') {
+      return;
+    }
+
+    if (mapped == null) return;
+    _applyLivePayload(mapped, sourceLabel: 'WebSocket');
+  }
+
+  Map<String, dynamic>? _toStringDynamicMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) {
+      return raw.map<String, dynamic>((dynamic key, dynamic value) {
+        return MapEntry(key.toString(), value);
+      });
+    }
+    return null;
   }
 
   void _onMqttData(Map<String, dynamic> payload) {
@@ -723,7 +808,7 @@ class _DashboardPageState extends State<DashboardPage> {
       _reconnectTimer = Timer(const Duration(seconds: 3), () {
         _reconnectTimer = null;
         if (!mounted) return;
-        _switchSocket(_activeWsUrl);
+        _switchSocket(_activeWsUrl, transport: _activeTransport);
       });
     }
   }
@@ -747,6 +832,8 @@ class _DashboardPageState extends State<DashboardPage> {
         return 'MQTT';
       case _LiveTransport.websocketLegacy:
         return 'WebSocket (Legacy)';
+      case _LiveTransport.localBackend:
+        return 'Local Backend';
       case _LiveTransport.firestore:
         return 'Firestore Fallback';
     }
@@ -783,6 +870,8 @@ class _DashboardPageState extends State<DashboardPage> {
         return _activeMqttTopic ?? mqttTopicLive ?? 'Not available yet';
       case _LiveTransport.websocketLegacy:
         return _activeWsUrl ?? wsUrl ?? 'Not available yet';
+      case _LiveTransport.localBackend:
+        return _activeWsUrl ?? 'Local backend not configured';
       case _LiveTransport.firestore:
         return mqttTopicLive ?? wsUrl ?? 'Not available yet';
     }
@@ -1111,12 +1200,21 @@ class _DashboardPageState extends State<DashboardPage> {
                 .toString()
                 .toLowerCase()
                 .trim();
+            final localBackendWsUrl = LocalBackendConfig.websocketUrlForDevice(
+              deviceId,
+            );
 
             final prefersMqtt = realtimeTransport == 'mqtt' && mqttEnabled;
             final hasMqttTopic =
                 mqttTopicLive != null && mqttTopicLive.trim().isNotEmpty;
 
-            if (prefersMqtt && hasMqttTopic) {
+            if (localBackendWsUrl != null) {
+              _queueMqttSync(rawTopic: null, rawStatusTopic: null);
+              _queueWsUrlSync(
+                localBackendWsUrl,
+                transport: _LiveTransport.localBackend,
+              );
+            } else if (prefersMqtt && hasMqttTopic) {
               _queueWsUrlSync(null);
               _queueMqttSync(
                 rawTopic: mqttTopicLive,
