@@ -49,11 +49,68 @@ class WsHub {
           firebaseLoginUser: user,
         }),
       );
+      this.sendInitialDeviceState(socket, deviceId).catch((error) => {
+        this.logger.warn(`[ws] initial stream snapshot failed: ${error.message || error}`);
+      });
+
+      const heartbeat = setInterval(() => {
+        if (socket.readyState !== WebSocket.OPEN) return;
+        socket.send(
+          JSON.stringify({
+            type: 'stream_heartbeat',
+            payload: {
+              deviceId: deviceId || null,
+              serverTime: new Date().toISOString(),
+              localBackend: true,
+            },
+          }),
+        );
+      }, 5000);
 
       socket.on('message', (raw) => this.handleClientMessage(socket, raw));
-      socket.on('close', () => this.clients.delete(socket));
-      socket.on('error', () => this.clients.delete(socket));
+      socket.on('close', () => {
+        clearInterval(heartbeat);
+        this.clients.delete(socket);
+      });
+      socket.on('error', () => {
+        clearInterval(heartbeat);
+        this.clients.delete(socket);
+      });
     });
+  }
+
+  async sendInitialDeviceState(socket, deviceId) {
+    if (!deviceId || socket.readyState !== WebSocket.OPEN) return;
+    const device = await this.db.getDevice(deviceId);
+    if (!device || socket.readyState !== WebSocket.OPEN) return;
+
+    socket.send(
+      JSON.stringify({
+        type: 'device_status',
+        payload: {
+          deviceId,
+          online: device.online,
+          espStatus: device.espStatus,
+          lastSeen: device.lastSeen,
+        },
+      }),
+    );
+
+    const lastPayload =
+      device.lastPayload && typeof device.lastPayload === 'object' ? device.lastPayload : {};
+    if (Object.keys(lastPayload).length === 0) return;
+
+    socket.send(
+      JSON.stringify({
+        type: 'telemetry',
+        payload: {
+          ...lastPayload,
+          deviceId,
+          streamReplay: true,
+          streamedAt: new Date().toISOString(),
+        },
+      }),
+    );
   }
 
   async handleClientMessage(socket, raw) {

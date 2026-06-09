@@ -8,6 +8,7 @@
 #include <ESP32Servo.h>
 #include <math.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <time.h>
 
 #include "addons/TokenHelper.h"
@@ -43,7 +44,9 @@ const int RELAY_PH_DOWN_PIN = 19;
 const int RELAY_NUTRIENT_PIN = 21;
 const int RELAY_FISH_TO_FILTER_PIN = 22;
 const int FISH_FEEDER_SERVO_PIN = 23;
-const bool RELAY_ACTIVE_HIGH = true;
+// Most small ESP32 relay boards are active-low: LOW energizes the relay.
+// Set this to true only if your relay board switches on when the GPIO is HIGH.
+const bool RELAY_ACTIVE_HIGH = false;
 const int FISH_FEEDER_SERVO_IDLE_DEG = 90;
 const int FISH_FEEDER_SERVO_ACTIVE_DEG = 180;
 const int FISH_FEEDER_SERVO_MIN_US = 500;
@@ -128,6 +131,7 @@ bool feederPulseActive = false;
 unsigned long feederPulseEndMs = 0;
 String feederPulseCommandPath = "";
 unsigned long feederPulseDurationMs = 0;
+bool lastNanoOnlineState = false;
 
 struct UnoTelemetry {
   bool hasPh = false;
@@ -373,6 +377,13 @@ bool parseStrictFloat(const String &raw, float &outValue) {
 void setRelayOutputPin(int pin, bool state) {
   int level = state ? (RELAY_ACTIVE_HIGH ? HIGH : LOW) : (RELAY_ACTIVE_HIGH ? LOW : HIGH);
   digitalWrite(pin, level);
+  Serial.printf(
+    "[Relay] pin=%d state=%s gpio_level=%s polarity=%s\n",
+    pin,
+    state ? "ON" : "OFF",
+    level == HIGH ? "HIGH" : "LOW",
+    RELAY_ACTIVE_HIGH ? "active-high" : "active-low"
+  );
 }
 
 void setFishFeederServoState(bool active) {
@@ -464,21 +475,56 @@ String channelStateLabel(const SensorChannel &channel) {
   return channel.lastCycleOk ? "ok" : "stale";
 }
 
+unsigned long nanoAgeMs() {
+  if (unoTelemetry.lastUpdateMs == 0) return ULONG_MAX;
+  return millis() - unoTelemetry.lastUpdateMs;
+}
+
+bool isNanoOnline() {
+  return USE_UNO_UART &&
+         unoTelemetry.lastUpdateMs > 0 &&
+         nanoAgeMs() <= UNO_DATA_TIMEOUT_MS;
+}
+
+String nanoMissingFields() {
+  String missing = "";
+  if (!unoTelemetry.hasPh) missing += "PH,";
+  if (!unoTelemetry.hasTds) missing += "TDS,";
+  if (!unoTelemetry.hasPhUpLevel) missing += "PHUP,";
+  if (!unoTelemetry.hasPhDownLevel) missing += "PHDOWN,";
+  if (!unoTelemetry.hasNutrientLevel) missing += "NUTRIENT,";
+  if (missing.endsWith(",")) missing.remove(missing.length() - 1);
+  return missing;
+}
+
+String nanoErrorMessage() {
+  if (!USE_UNO_UART) return "Nano UART disabled in firmware";
+  if (!isNanoOnline()) {
+    return "No valid Arduino Nano UART data for 15s. Check Nano power, common GND, Nano TX(D1) to ESP32 RX16 through level shifting, and 115200 baud.";
+  }
+  String missing = nanoMissingFields();
+  if (missing.length() > 0) {
+    return "Arduino Nano is connected, but these readings are missing: " + missing;
+  }
+  return "";
+}
+
 void refreshSensorStatusSummary() {
+  bool nanoOnline = isNanoOnline();
   lastReadOk =
+    nanoOnline &&
     phChannel.lastCycleOk &&
     tdsChannel.lastCycleOk &&
     tempChannel.lastCycleOk &&
-    fishLevelChannel.lastCycleOk &&
     phUpLevelChannel.lastCycleOk &&
     phDownLevelChannel.lastCycleOk &&
     nutrientLevelChannel.lastCycleOk;
 
   sensorStatus =
-    String("ph=") + channelStateLabel(phChannel) +
+    String("nano=") + (nanoOnline ? "online" : "offline") +
+    ",ph=" + channelStateLabel(phChannel) +
     ",tds=" + channelStateLabel(tdsChannel) +
     ",temp=" + channelStateLabel(tempChannel) +
-    ",fish=" + channelStateLabel(fishLevelChannel) +
     ",phUp=" + channelStateLabel(phUpLevelChannel) +
     ",phDown=" + channelStateLabel(phDownLevelChannel) +
     ",nutrient=" + channelStateLabel(nutrientLevelChannel);
@@ -535,6 +581,9 @@ void pollUnoSerial() {
     if (ch == '\r') continue;
     if (ch == '\n') {
       if (unoTelemetry.lineBuffer.length() > 0) {
+        if (CONSOLE_OUTPUT_ENABLED) {
+          Serial.println("[UNO] " + unoTelemetry.lineBuffer);
+        }
         parseUnoLine(unoTelemetry.lineBuffer);
         unoTelemetry.lineBuffer = "";
       }
@@ -554,6 +603,12 @@ void pollUnoSerial() {
     unoTelemetry.hasPhUpLevel = false;
     unoTelemetry.hasPhDownLevel = false;
     unoTelemetry.hasNutrientLevel = false;
+  }
+
+  bool nanoOnline = isNanoOnline();
+  if (nanoOnline != lastNanoOnlineState) {
+    lastNanoOnlineState = nanoOnline;
+    Serial.println(String("[UNO] status ") + (nanoOnline ? "online" : "offline") + " - " + nanoErrorMessage());
   }
 }
 
@@ -587,14 +642,12 @@ void acquireSensors() {
   float effectiveTemp = tempChannel.value;
   float phCandidate = resolvePhReading();
   float tdsCandidate = resolveTdsReading(effectiveTemp);
-  float fishLevelCandidate = unoTelemetry.hasFishLevel ? unoTelemetry.fishLevelPct : NAN;
   float phUpCandidate = unoTelemetry.hasPhUpLevel ? unoTelemetry.phUpLevelPct : NAN;
   float phDownCandidate = unoTelemetry.hasPhDownLevel ? unoTelemetry.phDownLevelPct : NAN;
   float nutrientCandidate = unoTelemetry.hasNutrientLevel ? unoTelemetry.nutrientLevelPct : NAN;
 
   updateChannel(phChannel, phCandidate, PH_MIN_VALID, PH_MAX_VALID);
   updateChannel(tdsChannel, tdsCandidate, TDS_MIN_VALID, TDS_MAX_VALID);
-  updateChannel(fishLevelChannel, fishLevelCandidate, 0.0f, 100.0f);
   updateChannel(phUpLevelChannel, phUpCandidate, 0.0f, 100.0f);
   updateChannel(phDownLevelChannel, phDownCandidate, 0.0f, 100.0f);
   updateChannel(nutrientLevelChannel, nutrientCandidate, 0.0f, 100.0f);
@@ -602,6 +655,9 @@ void acquireSensors() {
   temperatureC = tempChannel.value;
   ph = phChannel.value;
   tdsPpm = tdsChannel.value;
+  // No fish tank level sensor is installed in this build. Keep the last
+  // configured value for backward-compatible app fields, but do not mark the
+  // Nano unhealthy when no FISH line is received.
   waterLevelPct = fishLevelChannel.value;
   phUpTankLevelPct = phUpLevelChannel.value;
   phDownTankLevelPct = phDownLevelChannel.value;
@@ -626,6 +682,10 @@ String buildSnapshotJson() {
   js.set("nutrientTankLevelPct", nutrientTankLevelPct);
   js.set("sensorStatus", sensorStatus);
   js.set("lastReadOk", lastReadOk);
+  js.set("nanoOnline", isNanoOnline());
+  js.set("nanoLastSeenMs", unoTelemetry.lastUpdateMs == 0 ? 0 : (int)unoTelemetry.lastUpdateMs);
+  js.set("nanoAgeMs", nanoAgeMs() == ULONG_MAX ? -1 : (int)nanoAgeMs());
+  js.set("nanoError", nanoErrorMessage());
   js.set("sampleCount", (int)sampleCount);
   js.set("heartbeatSeq", (int)sampleCount);
   js.set("relayStates/phUp", relayPhUpState);
@@ -793,6 +853,10 @@ void setDeviceFields(FirebaseJson &content) {
   content.set("fields/nutrientTankLevelPct/doubleValue", nutrientTankLevelPct);
   content.set("fields/sensorStatus/stringValue", sensorStatus);
   content.set("fields/lastReadOk/booleanValue", lastReadOk);
+  content.set("fields/nanoOnline/booleanValue", isNanoOnline());
+  content.set("fields/nanoLastSeenMs/integerValue", String(unoTelemetry.lastUpdateMs));
+  content.set("fields/nanoAgeMs/integerValue", String(nanoAgeMs() == ULONG_MAX ? -1 : (int)nanoAgeMs()));
+  content.set("fields/nanoError/stringValue", nanoErrorMessage());
   content.set("fields/sampleCount/integerValue", String(sampleCount));
   content.set("fields/heartbeatSeq/integerValue", String(sampleCount));
   content.set("fields/relayStates/mapValue/fields/phUp/booleanValue", relayPhUpState);
@@ -837,7 +901,7 @@ void updateDeviceStatus(bool online) {
     "",
     deviceDocPath().c_str(),
     content.raw(),
-    "name,online,espStatus,lastSeen,rssi,temperatureC,ph,waterLevelPct,tdsPpm,phUpTankLevelPct,phDownTankLevelPct,nutrientTankLevelPct,sensorStatus,lastReadOk,sampleCount,heartbeatSeq,relayStates,relaySummary,wsUrl,realtimeTransport,mqttTopicLive,mqttStatusTopic,mqttCommandTopic,mqttCommandAckTopic,mqttEnabled,simulator"
+    "name,online,espStatus,lastSeen,rssi,temperatureC,ph,waterLevelPct,tdsPpm,phUpTankLevelPct,phDownTankLevelPct,nutrientTankLevelPct,sensorStatus,lastReadOk,nanoOnline,nanoLastSeenMs,nanoAgeMs,nanoError,sampleCount,heartbeatSeq,relayStates,relaySummary,wsUrl,realtimeTransport,mqttTopicLive,mqttStatusTopic,mqttCommandTopic,mqttCommandAckTopic,mqttEnabled,simulator"
   );
   printFirestoreResult("updateDeviceStatus", patchOk);
 }
@@ -856,6 +920,10 @@ void writeReadingSnapshot() {
   content.set("fields/nutrientTankLevelPct/doubleValue", nutrientTankLevelPct);
   content.set("fields/sensorStatus/stringValue", sensorStatus);
   content.set("fields/lastReadOk/booleanValue", lastReadOk);
+  content.set("fields/nanoOnline/booleanValue", isNanoOnline());
+  content.set("fields/nanoLastSeenMs/integerValue", String(unoTelemetry.lastUpdateMs));
+  content.set("fields/nanoAgeMs/integerValue", String(nanoAgeMs() == ULONG_MAX ? -1 : (int)nanoAgeMs()));
+  content.set("fields/nanoError/stringValue", nanoErrorMessage());
   content.set("fields/sampleCount/integerValue", String(sampleCount));
   content.set("fields/relayStates/mapValue/fields/phUp/booleanValue", relayPhUpState);
   content.set("fields/relayStates/mapValue/fields/phDown/booleanValue", relayPhDownState);
@@ -1218,7 +1286,15 @@ void onMqttMessage(char *topic, byte *payload, unsigned int length) {
   }
 
   bool hasTargetState = targetData.success;
-  bool targetState = hasTargetState ? targetData.boolValue : false;
+  bool targetState = false;
+  if (hasTargetState) {
+    String targetRaw = targetData.stringValue;
+    targetRaw.toLowerCase();
+    targetState = targetData.boolValue ||
+                  targetRaw == "true" ||
+                  targetRaw == "1" ||
+                  (targetData.doubleValue > 0.5);
+  }
   bool hasDurationMs = false;
   unsigned long durationMs = 0;
 
@@ -1292,7 +1368,14 @@ void setup() {
   applyRelayState("fish_feeder", false);
 
   if (USE_UNO_UART) {
+    unoSerial.setRxBufferSize(512);
     unoSerial.begin(UNO_UART_BAUD, SERIAL_8N1, UNO_UART_RX_PIN, UNO_UART_TX_PIN);
+    Serial.printf(
+      "[UNO] UART2 listening rx=%d tx=%d baud=%lu\n",
+      UNO_UART_RX_PIN,
+      UNO_UART_TX_PIN,
+      (unsigned long)UNO_UART_BAUD
+    );
   }
 
   waterTempSensor.begin();
@@ -1336,27 +1419,34 @@ void setup() {
   Firebase.begin(&config, &auth);
   Firebase.reconnectWiFi(true);
 
-  Serial.print("Waiting Firebase auth");
-  unsigned long authStartMs = millis();
-  while (!Firebase.ready() && millis() - authStartMs < 20000) {
-    delay(200);
-    Serial.print(".");
-  }
-  Serial.println();
-
-  Serial.print("Waiting UTC time sync");
-  bool timeReady = syncUtcTimeViaNtp(30000);
-  Serial.println();
-  if (!timeReady) {
-    Serial.println("[Firestore] UTC time sync timeout; timestamped writes will retry later");
+  const bool mqttReadyAtBoot = mqttClient.connected();
+  if (mqttReadyAtBoot) {
+    Serial.println("[Firebase] local MQTT connected; skipping blocking Firebase boot wait");
   } else {
-    Serial.println("[Firestore] UTC time synchronized");
+    Serial.print("Waiting Firebase auth");
+    unsigned long authStartMs = millis();
+    while (!Firebase.ready() && millis() - authStartMs < 20000) {
+      delay(200);
+      Serial.print(".");
+    }
+    Serial.println();
+
+    Serial.print("Waiting UTC time sync");
+    bool timeReady = syncUtcTimeViaNtp(30000);
+    Serial.println();
+    if (!timeReady) {
+      Serial.println("[Firestore] UTC time sync timeout; timestamped writes will retry later");
+    } else {
+      Serial.println("[Firestore] UTC time synchronized");
+    }
   }
 
   acquireSensors();
-  ensureDeviceDocument();
-  updateDeviceStatus(true);
-  writeReadingSnapshot();
+  if (!mqttReadyAtBoot) {
+    ensureDeviceDocument();
+    updateDeviceStatus(true);
+    writeReadingSnapshot();
+  }
   publishMqttSnapshot();
   broadcastSnapshot();
   logEvent("info", "device_online", "Aquaponics ESP32 connected and reporting online");
@@ -1366,6 +1456,7 @@ void loop() {
   wsServer.loop();
   ensureMqttConnected();
   mqttClient.loop();
+  pollUnoSerial();
   processFeederPulse();
 
   if (millis() - lastSensorMs >= SENSOR_INTERVAL_MS) {

@@ -76,14 +76,14 @@ class _ControlPageState extends State<ControlPage> {
     );
     if (sentWs) {
       if (announce && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("${type.toUpperCase()} sent")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("${type.toUpperCase()} sent")));
       }
       return;
     }
 
-    // Fallback: HTTP command endpoint on the local backend.
+    // Fallback: HTTP command endpoint on the realtime server.
     final sentLocal = await _localBackend.sendCommand(
       deviceId: deviceId,
       type: type,
@@ -93,7 +93,7 @@ class _ControlPageState extends State<ControlPage> {
     if (sentLocal) {
       if (announce && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("${type.toUpperCase()} queued locally")),
+          SnackBar(content: Text("${type.toUpperCase()} queued on server")),
         );
       }
       return;
@@ -259,7 +259,7 @@ class _ControlPageState extends State<ControlPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            "Automation mode queued locally: ${mode.toUpperCase()}",
+            "Automation mode queued on server: ${mode.toUpperCase()}",
           ),
         ),
       );
@@ -320,7 +320,7 @@ class _ControlPageState extends State<ControlPage> {
     if (sentLocal) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Automation settings queued locally")),
+        const SnackBar(content: Text("Automation settings queued on server")),
       );
       return;
     }
@@ -396,6 +396,14 @@ class _ControlPageState extends State<ControlPage> {
           final waterLevelPct = (d['waterLevelPct'] is num)
               ? (d['waterLevelPct'] as num).toDouble()
               : null;
+          final nanoOnline = d['nanoOnline'] == true;
+          final nanoAgeMs = d['nanoAgeMs'] is num
+              ? (d['nanoAgeMs'] as num).toInt()
+              : null;
+          final nanoError = (d['nanoError'] ?? '').toString().trim();
+          final showNanoError =
+              d.containsKey('nanoOnline') && !nanoOnline ||
+              nanoError.isNotEmpty;
 
           final automation = (d['automation'] is Map<String, dynamic>)
               ? (d['automation'] as Map<String, dynamic>)
@@ -492,6 +500,37 @@ class _ControlPageState extends State<ControlPage> {
                             isWaterLow
                                 ? "Water level LOW (${waterLevelPct.toStringAsFixed(1)}%). Auto-fill will trigger in AUTO mode."
                                 : "Water level OK (${waterLevelPct.toStringAsFixed(1)}%).",
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              if (showNanoError)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.red.withValues(alpha: 0.10),
+                      border: Border.all(
+                        color: Colors.red.shade300,
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.sensors_off, color: Colors.red.shade700),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            nanoError.isEmpty
+                                ? "Arduino Nano data is offline. Last packet: ${nanoAgeMs == null || nanoAgeMs < 0 ? 'none yet' : '${nanoAgeMs}ms ago'}."
+                                : "$nanoError Last packet: ${nanoAgeMs == null || nanoAgeMs < 0 ? 'none yet' : '${nanoAgeMs}ms ago'}.",
                             style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                         ),

@@ -28,6 +28,10 @@ class _TelemetryFrame {
   final double? nutrientTankLevelPct;
   final String? sensorStatus;
   final bool? lastReadOk;
+  final bool? nanoOnline;
+  final int? nanoLastSeenMs;
+  final int? nanoAgeMs;
+  final String? nanoError;
   final int? sampleCount;
   final Map<String, bool> relayStates;
   final String? relaySummary;
@@ -45,6 +49,10 @@ class _TelemetryFrame {
     this.nutrientTankLevelPct,
     this.sensorStatus,
     this.lastReadOk,
+    this.nanoOnline,
+    this.nanoLastSeenMs,
+    this.nanoAgeMs,
+    this.nanoError,
     this.sampleCount,
     this.relayStates = const {},
     this.relaySummary,
@@ -80,6 +88,11 @@ class _TelemetryFrame {
       sensorStatus:
           _toStringValue(json['sensorStatus']) ?? fallback?.sensorStatus,
       lastReadOk: _toBoolValue(json['lastReadOk']) ?? fallback?.lastReadOk,
+      nanoOnline: _toBoolValue(json['nanoOnline']) ?? fallback?.nanoOnline,
+      nanoLastSeenMs:
+          _toIntValue(json['nanoLastSeenMs']) ?? fallback?.nanoLastSeenMs,
+      nanoAgeMs: _toIntValue(json['nanoAgeMs']) ?? fallback?.nanoAgeMs,
+      nanoError: _toStringValue(json['nanoError']) ?? fallback?.nanoError,
       sampleCount: _toIntValue(json['sampleCount']) ?? fallback?.sampleCount,
       relayStates:
           _toBoolMap(json['relayStates']) ??
@@ -126,6 +139,11 @@ class _TelemetryFrame {
       sensorStatus:
           _toStringValue(data['sensorStatus']) ?? fallback?.sensorStatus,
       lastReadOk: _toBoolValue(data['lastReadOk']) ?? fallback?.lastReadOk,
+      nanoOnline: _toBoolValue(data['nanoOnline']) ?? fallback?.nanoOnline,
+      nanoLastSeenMs:
+          _toIntValue(data['nanoLastSeenMs']) ?? fallback?.nanoLastSeenMs,
+      nanoAgeMs: _toIntValue(data['nanoAgeMs']) ?? fallback?.nanoAgeMs,
+      nanoError: _toStringValue(data['nanoError']) ?? fallback?.nanoError,
       sampleCount: _toIntValue(data['sampleCount']) ?? fallback?.sampleCount,
       relayStates:
           _toBoolMap(data['relayStates']) ??
@@ -618,7 +636,7 @@ class _DashboardPageState extends State<DashboardPage> {
     unawaited(_openChannel(wsUrl, uri, transport));
   }
 
-  /// Opens the live WebSocket. For the local backend transport the Firebase ID
+  /// Opens the live WebSocket. For the realtime server transport the Firebase ID
   /// token is attached as a `token` query param so the server can authenticate
   /// the connection. The token is never attached to legacy/third-party URLs.
   Future<void> _openChannel(
@@ -690,7 +708,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final wrappedPayload = _toStringDynamicMap(mapped?['payload']);
 
     if (type == 'telemetry' && wrappedPayload != null) {
-      _applyLivePayload(wrappedPayload, sourceLabel: 'Local Backend');
+      _applyLivePayload(wrappedPayload, sourceLabel: 'Realtime Server');
       return;
     }
 
@@ -709,7 +727,10 @@ class _DashboardPageState extends State<DashboardPage> {
       return;
     }
 
-    if (type == 'hello' || type == 'command' || type == 'device_patch') {
+    if (type == 'hello' ||
+        type == 'stream_heartbeat' ||
+        type == 'command' ||
+        type == 'device_patch') {
       return;
     }
 
@@ -833,7 +854,7 @@ class _DashboardPageState extends State<DashboardPage> {
       case _LiveTransport.websocketLegacy:
         return 'WebSocket (Legacy)';
       case _LiveTransport.localBackend:
-        return 'Local Backend';
+        return 'Realtime Server';
       case _LiveTransport.firestore:
         return 'Firestore Fallback';
     }
@@ -864,6 +885,31 @@ class _DashboardPageState extends State<DashboardPage> {
     return '$value $unit';
   }
 
+  bool _hasNanoError(_TelemetryFrame frame) {
+    if (frame.nanoOnline == false) return true;
+    final error = frame.nanoError?.trim();
+    return error != null && error.isNotEmpty;
+  }
+
+  String _nanoHealthSubtitle(_TelemetryFrame frame) {
+    final online = frame.nanoOnline;
+    final ageMs = frame.nanoAgeMs;
+    final ageText = ageMs == null || ageMs < 0
+        ? 'No valid Nano packet yet'
+        : 'Last Nano packet ${ageMs}ms ago';
+    final error = frame.nanoError?.trim();
+    if (online == false) {
+      return error == null || error.isEmpty
+          ? 'Arduino Nano is offline. $ageText.'
+          : '$error\n$ageText.';
+    }
+    if (error != null && error.isNotEmpty) {
+      return '$error\n$ageText.';
+    }
+    if (online == true) return 'Arduino Nano UART online. $ageText.';
+    return 'Waiting for Nano health from ESP32.';
+  }
+
   String _effectiveEndpoint({String? wsUrl, String? mqttTopicLive}) {
     switch (_activeTransport) {
       case _LiveTransport.mqtt:
@@ -871,7 +917,7 @@ class _DashboardPageState extends State<DashboardPage> {
       case _LiveTransport.websocketLegacy:
         return _activeWsUrl ?? wsUrl ?? 'Not available yet';
       case _LiveTransport.localBackend:
-        return _activeWsUrl ?? 'Local backend not configured';
+        return _activeWsUrl ?? 'Realtime server not configured';
       case _LiveTransport.firestore:
         return mqttTopicLive ?? wsUrl ?? 'Not available yet';
     }
@@ -1289,6 +1335,7 @@ class _DashboardPageState extends State<DashboardPage> {
               activeFrame.nutrientTankLevelPct,
               low: 20,
             );
+            final hasNanoError = _hasNanoError(activeFrame);
 
             return SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
@@ -1316,6 +1363,15 @@ class _DashboardPageState extends State<DashboardPage> {
                       mqttTopicLive: mqttTopicLive,
                     ),
                   ),
+                  if (hasNanoError) ...[
+                    const SizedBox(height: 14),
+                    _infoCard(
+                      icon: Icons.sensors_off,
+                      iconColor: const Color(0xFFD84315),
+                      title: 'Arduino Nano Data Error',
+                      subtitle: _nanoHealthSubtitle(activeFrame),
+                    ),
+                  ],
                   const SizedBox(height: 14),
                   _infoCard(
                     icon: Icons.power,
@@ -1399,17 +1455,18 @@ class _DashboardPageState extends State<DashboardPage> {
 
                   const SizedBox(height: 18),
                   _infoCard(
-                    icon: activeFrame.lastReadOk == false
+                    icon: activeFrame.lastReadOk == false || hasNanoError
                         ? Icons.error_outline
                         : Icons.sensors,
-                    iconColor: activeFrame.lastReadOk == false
+                    iconColor: activeFrame.lastReadOk == false || hasNanoError
                         ? const Color(0xFFD84315)
                         : const Color(0xFF2E7D32),
                     title: 'Sensor Health',
                     subtitle:
                         'Status: ${activeFrame.sensorStatus ?? 'No status yet'}\n'
+                        '${_nanoHealthSubtitle(activeFrame)}\n'
                         'Samples: ${activeFrame.sampleCount?.toString() ?? '--'}\n'
-                        'Last read: ${activeFrame.lastReadOk == false ? 'Check sensors' : 'OK'}',
+                        'Last read: ${activeFrame.lastReadOk == false || hasNanoError ? 'Check sensors' : 'OK'}',
                   ),
 
                   const SizedBox(height: 18),

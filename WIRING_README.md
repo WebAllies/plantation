@@ -15,11 +15,10 @@ Current architecture:
 ### Arduino Nano
 - Reads pH sensor on `A2`
 - Reads TDS sensor on `A1`
-- Reads 4 ultrasonic tank level sensors on digital pins
+- Reads 3 ultrasonic dosing tank level sensors on digital pins
 - Sends serial messages to the ESP32:
   - `PH:x.xx`
   - `TDS:xxx.xx`
-  - `FISH:xx.xx`
   - `PHUP:xx.xx`
   - `PHDOWN:xx.xx`
   - `NUTRIENT:xx.xx`
@@ -39,12 +38,6 @@ Current architecture:
 ### TDS Sensor Module
 - `AO` -> Nano `A1`
 - `VCC` -> Nano `5V` or the module's rated supply
-- `GND` -> Nano `GND`
-
-### Fish Tank Ultrasonic Sensor
-- `TRIG` -> Nano `D2`
-- `ECHO` -> Nano `D3`
-- `VCC` -> Nano `5V`
 - `GND` -> Nano `GND`
 
 ### pH Up Tank Ultrasonic Sensor
@@ -123,29 +116,43 @@ Simple resistor divider example:
 
 ## Serial Monitor Output On The Nano
 The Nano sketch prints both machine-readable lines and human-readable monitor lines.
+On boot, it also prints the expected wiring map so you can confirm each sensor is plugged into the correct Nano pins.
 
 Examples:
 
 ```text
+MON:Nano aquaponics sensor sketch started
+MON:Baud = 115200
+MON:pH AO -> A2
+MON:TDS AO -> A1
+MON:pH Up ultrasonic TRIG=D4 ECHO=D5
+MON:pH Down ultrasonic TRIG=D6 ECHO=D7
+MON:Nutrient ultrasonic TRIG=D8 ECHO=D9
 PH:6.42
 TDS:913.20
-FISH:78.50
 PHUP:66.10
 PHDOWN:81.30
 NUTRIENT:54.90
 MON:------------------------------
 MON:pH = 6.42 pH
 MON:TDS = 913.20 ppm
-MON:Fish tank level = 78.50 %
 MON:pH Up tank level = 66.10 %
 MON:pH Down tank level = 81.30 %
 MON:Nutrient tank level = 54.90 %
-MON:Fish distance = 12.30 cm
 MON:pH Up distance = 14.10 cm
 MON:pH Down distance = 10.40 cm
 MON:Nutrient distance = 16.50 cm
 MON:------------------------------
 ```
+
+If an ultrasonic sensor does not respond, the Nano prints a diagnostic line:
+
+```text
+ERR:PHDOWN:NO_ECHO trig=D6 echo=D7
+ERR:NUTRIENT:NO_ECHO trig=D8 echo=D9
+```
+
+That means the Nano did not receive an echo pulse on the listed `ECHO` pin. Check that exact sensor's `VCC`, `GND`, `TRIG`, and `ECHO` wires.
 
 Use Nano Serial Monitor at:
 - `115200 baud`
@@ -162,8 +169,6 @@ Check and tune in [uno_aquaponics](/mnt/e/shuaib/plantation/uno_aquaponics):
 ### Ultrasonic Tank Levels
 Check and tune in [uno_aquaponics](/mnt/e/shuaib/plantation/uno_aquaponics):
 - `TANK_HEIGHT_CM`
-- `FISH_TANK_EMPTY_DISTANCE_CM`
-- `FISH_TANK_FULL_DISTANCE_CM`
 - `PH_UP_EMPTY_DISTANCE_CM`
 - `PH_UP_FULL_DISTANCE_CM`
 - `PH_DOWN_EMPTY_DISTANCE_CM`

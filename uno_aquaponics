@@ -5,8 +5,6 @@ const int PH_PIN = A2;
 const int TDS_PIN = A1;
 
 // Ultrasonic sensors on the Arduino Nano
-const int FISH_TANK_TRIG_PIN = 2;
-const int FISH_TANK_ECHO_PIN = 3;
 const int PH_UP_TRIG_PIN = 4;
 const int PH_UP_ECHO_PIN = 5;
 const int PH_DOWN_TRIG_PIN = 6;
@@ -17,8 +15,9 @@ const int NUTRIENT_ECHO_PIN = 9;
 // Sampling and timing
 const size_t ANALOG_SAMPLE_COUNT = 15;
 const unsigned long PUBLISH_INTERVAL_MS = 1000;
-const unsigned long ULTRASONIC_TIMEOUT_US = 30000;
+const unsigned long ULTRASONIC_TIMEOUT_US = 50000;
 const unsigned long SERIAL_BAUD = 115200;
+const uint8_t ULTRASONIC_ATTEMPTS = 3;
 const float ADC_REFERENCE_VOLTAGE = 5.0f;
 const float ADC_MAX_READING = 1023.0f;
 
@@ -30,8 +29,6 @@ const float WATER_TEMP_C = 25.0f;
 const float LEVEL_MIN_PCT = 0.0f;
 const float LEVEL_MAX_PCT = 100.0f;
 const float TANK_HEIGHT_CM = 10.0f;
-const float FISH_TANK_FULL_DISTANCE_CM = 6.0f;
-const float FISH_TANK_EMPTY_DISTANCE_CM = FISH_TANK_FULL_DISTANCE_CM + TANK_HEIGHT_CM;
 const float PH_UP_FULL_DISTANCE_CM = 5.0f;
 const float PH_UP_EMPTY_DISTANCE_CM = PH_UP_FULL_DISTANCE_CM + TANK_HEIGHT_CM;
 const float PH_DOWN_FULL_DISTANCE_CM = 5.0f;
@@ -112,20 +109,34 @@ float mapToPercent(float raw, float emptyRaw, float fullRaw) {
 }
 
 float readDistanceCm(int trigPin, int echoPin) {
-  digitalWrite(trigPin, LOW);
-  delayMicroseconds(2);
-  digitalWrite(trigPin, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
+  float bestReading = NAN;
 
-  unsigned long durationUs = pulseIn(echoPin, HIGH, ULTRASONIC_TIMEOUT_US);
-  if (durationUs == 0) return NAN;
+  for (uint8_t attempt = 0; attempt < ULTRASONIC_ATTEMPTS; attempt++) {
+    digitalWrite(trigPin, LOW);
+    delayMicroseconds(4);
+    digitalWrite(trigPin, HIGH);
+    delayMicroseconds(12);
+    digitalWrite(trigPin, LOW);
 
-  return durationUs * 0.0343f / 2.0f;
+    unsigned long durationUs = pulseIn(echoPin, HIGH, ULTRASONIC_TIMEOUT_US);
+    if (durationUs > 0) {
+      float distanceCm = durationUs * 0.0343f / 2.0f;
+      if (isfinite(distanceCm) && distanceCm > 1.0f && distanceCm < 450.0f) {
+        bestReading = distanceCm;
+        break;
+      }
+    }
+
+    delay(25);
+  }
+
+  return bestReading;
 }
 
-float distanceToPercent(float distanceCm, float emptyDistanceCm, float fullDistanceCm) {
-  return mapToPercent(distanceCm, emptyDistanceCm, fullDistanceCm);
+void primeUltrasonicPin(int trigPin, int echoPin) {
+  pinMode(trigPin, OUTPUT);
+  digitalWrite(trigPin, LOW);
+  pinMode(echoPin, INPUT);
 }
 
 void printMachineMetric(const char *key, float value) {
@@ -133,6 +144,15 @@ void printMachineMetric(const char *key, float value) {
   Serial.print(key);
   Serial.print(":");
   Serial.println(value, 2);
+}
+
+void printUltrasonicError(const char *key, int trigPin, int echoPin) {
+  Serial.print("ERR:");
+  Serial.print(key);
+  Serial.print(":NO_ECHO trig=D");
+  Serial.print(trigPin);
+  Serial.print(" echo=D");
+  Serial.println(echoPin);
 }
 
 void printMonitorMetric(const char *label, float value, const char *unit) {
@@ -151,16 +171,28 @@ void printMonitorMetric(const char *label, float value, const char *unit) {
   Serial.println();
 }
 
+void printStartupWiring() {
+  Serial.println("MON:Nano aquaponics sensor sketch started");
+  Serial.println("MON:Baud = 115200");
+  Serial.println("MON:pH AO -> A2");
+  Serial.println("MON:TDS AO -> A1");
+  Serial.println("MON:pH Up ultrasonic TRIG=D4 ECHO=D5");
+  Serial.println("MON:pH Down ultrasonic TRIG=D6 ECHO=D7");
+  Serial.println("MON:Nutrient ultrasonic TRIG=D8 ECHO=D9");
+  Serial.println("MON:If a sensor shows ERR:<KEY>:NO_ECHO, check VCC/GND/TRIG/ECHO for that exact pair.");
+}
+
+float distanceToPercent(float distanceCm, float emptyDistanceCm, float fullDistanceCm) {
+  return mapToPercent(distanceCm, emptyDistanceCm, fullDistanceCm);
+}
+
 void setup() {
   Serial.begin(SERIAL_BAUD);
-  pinMode(FISH_TANK_TRIG_PIN, OUTPUT);
-  pinMode(FISH_TANK_ECHO_PIN, INPUT);
-  pinMode(PH_UP_TRIG_PIN, OUTPUT);
-  pinMode(PH_UP_ECHO_PIN, INPUT);
-  pinMode(PH_DOWN_TRIG_PIN, OUTPUT);
-  pinMode(PH_DOWN_ECHO_PIN, INPUT);
-  pinMode(NUTRIENT_TRIG_PIN, OUTPUT);
-  pinMode(NUTRIENT_ECHO_PIN, INPUT);
+  primeUltrasonicPin(PH_UP_TRIG_PIN, PH_UP_ECHO_PIN);
+  primeUltrasonicPin(PH_DOWN_TRIG_PIN, PH_DOWN_ECHO_PIN);
+  primeUltrasonicPin(NUTRIENT_TRIG_PIN, NUTRIENT_ECHO_PIN);
+  delay(1000);
+  printStartupWiring();
 }
 
 void loop() {
@@ -171,19 +203,11 @@ void loop() {
 
   float phRaw = readMedianAverageAnalog(PH_PIN);
   float tdsRaw = readMedianAverageAnalog(TDS_PIN);
-  float fishDistanceCm = readDistanceCm(FISH_TANK_TRIG_PIN, FISH_TANK_ECHO_PIN);
   float phUpDistanceCm = readDistanceCm(PH_UP_TRIG_PIN, PH_UP_ECHO_PIN);
   float phDownDistanceCm = readDistanceCm(PH_DOWN_TRIG_PIN, PH_DOWN_ECHO_PIN);
   float nutrientDistanceCm = readDistanceCm(NUTRIENT_TRIG_PIN, NUTRIENT_ECHO_PIN);
   float phValue = isfinite(phRaw) ? computePh(phRaw) : NAN;
   float tdsValue = isfinite(tdsRaw) ? computeTds(tdsRaw, WATER_TEMP_C) : NAN;
-  float fishLevelPct = isfinite(fishDistanceCm)
-    ? distanceToPercent(
-        fishDistanceCm,
-        FISH_TANK_EMPTY_DISTANCE_CM,
-        FISH_TANK_FULL_DISTANCE_CM
-      )
-    : NAN;
   float phUpLevelPct = isfinite(phUpDistanceCm)
     ? distanceToPercent(
         phUpDistanceCm,
@@ -208,19 +232,21 @@ void loop() {
 
   printMachineMetric("PH", phValue);
   printMachineMetric("TDS", tdsValue);
-  printMachineMetric("FISH", fishLevelPct);
   printMachineMetric("PHUP", phUpLevelPct);
   printMachineMetric("PHDOWN", phDownLevelPct);
   printMachineMetric("NUTRIENT", nutrientLevelPct);
+  if (!isfinite(phUpDistanceCm)) printUltrasonicError("PHUP", PH_UP_TRIG_PIN, PH_UP_ECHO_PIN);
+  if (!isfinite(phDownDistanceCm)) printUltrasonicError("PHDOWN", PH_DOWN_TRIG_PIN, PH_DOWN_ECHO_PIN);
+  if (!isfinite(nutrientDistanceCm)) printUltrasonicError("NUTRIENT", NUTRIENT_TRIG_PIN, NUTRIENT_ECHO_PIN);
 
   Serial.println("MON:------------------------------");
   printMonitorMetric("pH", phValue, "pH");
   printMonitorMetric("TDS", tdsValue, "ppm");
-  printMonitorMetric("Fish tank level", fishLevelPct, "%");
+  printMonitorMetric("pH raw ADC", phRaw, "");
+  printMonitorMetric("TDS raw ADC", tdsRaw, "");
   printMonitorMetric("pH Up tank level", phUpLevelPct, "%");
   printMonitorMetric("pH Down tank level", phDownLevelPct, "%");
   printMonitorMetric("Nutrient tank level", nutrientLevelPct, "%");
-  printMonitorMetric("Fish distance", fishDistanceCm, "cm");
   printMonitorMetric("pH Up distance", phUpDistanceCm, "cm");
   printMonitorMetric("pH Down distance", phDownDistanceCm, "cm");
   printMonitorMetric("Nutrient distance", nutrientDistanceCm, "cm");
