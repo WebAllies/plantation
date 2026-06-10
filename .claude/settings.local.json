@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -m 10 http://116.203.96.119:8080/health)"
+    ]
+  }
+}

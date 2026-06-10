@@ -29,8 +29,8 @@ CREATE TABLE IF NOT EXISTS telemetry_readings (
   nutrient_tank_level_pct DOUBLE PRECISION,
   sensor_status TEXT,
   last_read_ok BOOLEAN,
-  sample_count INTEGER,
-  heartbeat_seq INTEGER,
+  sample_count BIGINT,
+  heartbeat_seq BIGINT,
   relay_states JSONB NOT NULL DEFAULT '{}'::jsonb,
   payload JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -38,6 +38,10 @@ CREATE TABLE IF NOT EXISTS telemetry_readings (
 
 CREATE INDEX IF NOT EXISTS telemetry_readings_device_ts_idx
   ON telemetry_readings(device_id, ts DESC);
+
+ALTER TABLE telemetry_readings
+  ALTER COLUMN sample_count TYPE BIGINT,
+  ALTER COLUMN heartbeat_seq TYPE BIGINT;
 
 CREATE TABLE IF NOT EXISTS device_commands (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

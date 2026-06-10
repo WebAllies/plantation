@@ -77,6 +77,7 @@ function deviceBackupPayload(row) {
 }
 
 function commandPayload(row) {
+  const payload = asObject(row.payload);
   return {
     id: row.id,
     commandId: row.id,
@@ -90,6 +91,9 @@ function commandPayload(row) {
     requestedAt: row.requested_at,
     executedAt: row.executed_at,
     message: row.message || '',
+    relayStates: asObject(payload.relayStates),
+    relaySummary: payload.relaySummary || '',
+    ackPayload: payload,
     localBackendPrimary: true,
   };
 }
@@ -141,10 +145,13 @@ class LocalDatabase {
     return camelDeviceRow(result.rows[0]);
   }
 
-  async storeTelemetry(deviceId, payload) {
+  async storeTelemetry(deviceId, payload, options = {}) {
     const normalized = { ...asObject(payload), deviceId };
+    delete normalized.temperatureC;
     const ts = dateFromPayload(normalized);
     const relayStates = asObject(normalized.relayStates);
+    const relayStateKeys = Object.keys(relayStates).length;
+    const markDeviceOnline = options.markDeviceOnline !== false;
     const client = await this.pool.connect();
 
     try {
@@ -154,15 +161,26 @@ class LocalDatabase {
           id, name, online, esp_status, last_seen, offline_detected_at,
           last_payload, relay_states, rssi, updated_at
         )
-        VALUES ($1, $2, TRUE, 'online', $3, NULL, $4::jsonb, $5::jsonb, $6, now())
+        VALUES (
+          $1,
+          $2,
+          $7,
+          CASE WHEN $7 THEN 'online' ELSE 'offline' END,
+          CASE WHEN $7 THEN $3::timestamptz ELSE NULL END,
+          NULL,
+          $4::jsonb,
+          $5::jsonb,
+          $6,
+          now()
+        )
         ON CONFLICT (id) DO UPDATE SET
-          online = TRUE,
-          esp_status = 'online',
-          last_seen = EXCLUDED.last_seen,
-          offline_detected_at = NULL,
-          last_payload = EXCLUDED.last_payload,
-          relay_states = EXCLUDED.relay_states,
-          rssi = EXCLUDED.rssi,
+          online = CASE WHEN $7 THEN TRUE ELSE devices.online END,
+          esp_status = CASE WHEN $7 THEN 'online' ELSE devices.esp_status END,
+          last_seen = CASE WHEN $7 THEN EXCLUDED.last_seen ELSE devices.last_seen END,
+          offline_detected_at = CASE WHEN $7 THEN NULL ELSE devices.offline_detected_at END,
+          last_payload = devices.last_payload || EXCLUDED.last_payload,
+          relay_states = CASE WHEN $8 > 0 THEN EXCLUDED.relay_states ELSE devices.relay_states END,
+          rssi = CASE WHEN $7 THEN EXCLUDED.rssi ELSE devices.rssi END,
           updated_at = now()
         RETURNING *`,
         [
@@ -172,6 +190,8 @@ class LocalDatabase {
           JSON.stringify(normalized),
           JSON.stringify(relayStates),
           asInt(normalized.rssi),
+          markDeviceOnline,
+          relayStateKeys,
         ],
       );
 

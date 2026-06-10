@@ -54,13 +54,6 @@ class _SystemTabState extends State<SystemTab> {
     return "$y-$m-$d  $hh:$mm";
   }
 
-  int _asInt(dynamic v) {
-    if (v is int) return v;
-    if (v is double) return v.toInt();
-    if (v is String) return int.tryParse(v) ?? 0;
-    return 0;
-  }
-
   Future<void> _loadSystemSettings() async {
     try {
       final doc = await FirebaseFirestore.instance
@@ -75,8 +68,9 @@ class _SystemTabState extends State<SystemTab> {
         _enableNotifications = (data["enableNotifications"] is bool)
             ? data["enableNotifications"] as bool
             : true;
-        _autoMode =
-            (data["autoMode"] is bool) ? data["autoMode"] as bool : true;
+        _autoMode = (data["autoMode"] is bool)
+            ? data["autoMode"] as bool
+            : true;
         _maintenanceMode = (data["maintenanceMode"] is bool)
             ? data["maintenanceMode"] as bool
             : false;
@@ -163,14 +157,14 @@ class _SystemTabState extends State<SystemTab> {
   }
 
   Widget _sectionTitle(String t) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Text(t, style: const TextStyle(fontWeight: FontWeight.w900)),
-      );
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Text(t, style: const TextStyle(fontWeight: FontWeight.w900)),
+  );
 
   Widget _miniCard({required Widget child}) => Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        child: Padding(padding: const EdgeInsets.all(14), child: child),
-      );
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+    child: Padding(padding: const EdgeInsets.all(14), child: child),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -294,7 +288,11 @@ class _SystemTabState extends State<SystemTab> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   for (int i = 0; i < docs.length; i++) ...[
-                    _DeviceTile(deviceId: docs[i].id, data: docs[i].data(), fmt: _fmt),
+                    _DeviceTile(
+                      deviceId: docs[i].id,
+                      data: docs[i].data(),
+                      fmt: _fmt,
+                    ),
                     if (i != docs.length - 1) const Divider(),
                   ],
                   const SizedBox(height: 6),
@@ -489,9 +487,9 @@ class _SystemTabState extends State<SystemTab> {
                       onPressed: _busy
                           ? null
                           : () => _sendDeviceCommand(
-                                type: "ph_up",
-                                targetState: true,
-                              ),
+                              type: "ph_up",
+                              targetState: true,
+                            ),
                       icon: const Icon(Icons.add),
                       label: const Text("pH Up ON"),
                     ),
@@ -499,9 +497,9 @@ class _SystemTabState extends State<SystemTab> {
                       onPressed: _busy
                           ? null
                           : () => _sendDeviceCommand(
-                                type: "ph_up",
-                                targetState: false,
-                              ),
+                              type: "ph_up",
+                              targetState: false,
+                            ),
                       icon: const Icon(Icons.remove),
                       label: const Text("pH Up OFF"),
                     ),
@@ -509,9 +507,9 @@ class _SystemTabState extends State<SystemTab> {
                       onPressed: _busy
                           ? null
                           : () => _sendDeviceCommand(
-                                type: "ph_down",
-                                targetState: true,
-                              ),
+                              type: "ph_down",
+                              targetState: true,
+                            ),
                       icon: const Icon(Icons.exposure_minus_1),
                       label: const Text("pH Down ON"),
                     ),
@@ -519,9 +517,9 @@ class _SystemTabState extends State<SystemTab> {
                       onPressed: _busy
                           ? null
                           : () => _sendDeviceCommand(
-                                type: "ph_down",
-                                targetState: false,
-                              ),
+                              type: "ph_down",
+                              targetState: false,
+                            ),
                       icon: const Icon(Icons.exposure_neg_1),
                       label: const Text("pH Down OFF"),
                     ),
@@ -529,9 +527,9 @@ class _SystemTabState extends State<SystemTab> {
                       onPressed: _busy
                           ? null
                           : () => _sendDeviceCommand(
-                                type: "nutrient",
-                                targetState: true,
-                              ),
+                              type: "nutrient",
+                              targetState: true,
+                            ),
                       icon: const Icon(Icons.opacity),
                       label: const Text("Nutrient ON"),
                     ),
@@ -539,9 +537,9 @@ class _SystemTabState extends State<SystemTab> {
                       onPressed: _busy
                           ? null
                           : () => _sendDeviceCommand(
-                                type: "nutrient",
-                                targetState: false,
-                              ),
+                              type: "nutrient",
+                              targetState: false,
+                            ),
                       icon: const Icon(Icons.opacity_outlined),
                       label: const Text("Nutrient OFF"),
                     ),
@@ -549,29 +547,9 @@ class _SystemTabState extends State<SystemTab> {
                       onPressed: _busy
                           ? null
                           : () => _sendDeviceCommand(
-                                type: "fish_to_filter",
-                                targetState: true,
-                              ),
-                      icon: const Icon(Icons.water),
-                      label: const Text("Transfer ON"),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: _busy
-                          ? null
-                          : () => _sendDeviceCommand(
-                                type: "fish_to_filter",
-                                targetState: false,
-                              ),
-                      icon: const Icon(Icons.water_drop_outlined),
-                      label: const Text("Transfer OFF"),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: _busy
-                          ? null
-                          : () => _sendDeviceCommand(
-                                type: "fish_feeder",
-                                durationMs: 4000,
-                              ),
+                              type: "fish_feeder",
+                              durationMs: 4000,
+                            ),
                       icon: const Icon(Icons.restaurant),
                       label: const Text("Feed 4s"),
                     ),
@@ -642,8 +620,8 @@ class _SystemTabState extends State<SystemTab> {
                       onPressed: _busy
                           ? null
                           : () => _toast(
-                                "Next: export logs CSV/PDF (I can add this).",
-                              ),
+                              "Next: export logs CSV/PDF (I can add this).",
+                            ),
                       icon: const Icon(Icons.download),
                       label: const Text("Export Logs"),
                     ),
@@ -683,9 +661,7 @@ class _SystemTabState extends State<SystemTab> {
 
             final docs = snap.data!.docs;
             if (docs.isEmpty) {
-              return _miniCard(
-                child: const Text("No alert history found."),
-              );
+              return _miniCard(child: const Text("No alert history found."));
             }
 
             return _miniCard(
@@ -956,8 +932,9 @@ class _DeviceTile extends StatelessWidget {
     final lastSeen = (data["lastSeenAt"] is Timestamp)
         ? (data["lastSeenAt"] as Timestamp).toDate()
         : null;
-    final firmware =
-        (data["firmware"] is String) ? data["firmware"] as String : "—";
+    final firmware = (data["firmware"] is String)
+        ? data["firmware"] as String
+        : "—";
     final ip = (data["ip"] is String) ? data["ip"] as String : "—";
     final rssi = data["wifiRssi"] ?? data["rssi"];
 
@@ -988,8 +965,7 @@ class _LogTile extends StatelessWidget {
         : null;
     final level = (data["level"] is String) ? data["level"] as String : "info";
     final event = (data["event"] is String) ? data["event"] as String : "event";
-    final detail =
-        (data["detail"] is String) ? data["detail"] as String : "";
+    final detail = (data["detail"] is String) ? data["detail"] as String : "";
 
     IconData icon;
     if (level == "error") {
@@ -1024,8 +1000,9 @@ class _AlertHistoryTile extends StatelessWidget {
     final eventType = (data["eventType"] is String)
         ? data["eventType"] as String
         : "event";
-    final message =
-        (data["message"] is String) ? data["message"] as String : "—";
+    final message = (data["message"] is String)
+        ? data["message"] as String
+        : "—";
     final metric = (data["metric"] is String) ? data["metric"] as String : "—";
     final state = (data["state"] is String) ? data["state"] as String : "—";
 

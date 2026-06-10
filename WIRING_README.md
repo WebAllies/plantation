@@ -4,7 +4,7 @@ This document describes the current hardware wiring for the `uno_aquaponics` and
 
 Current architecture:
 - Arduino Nano handles all analog and ultrasonic sensors
-- ESP32 handles DS18B20 temperature, Wi-Fi, MQTT, Firebase, and app/backend telemetry
+- ESP32 handles Wi-Fi, MQTT, Firebase, and app/backend telemetry
 - Nano sends sensor values to the ESP32 over UART
 
 ## Firmware Upload
@@ -24,7 +24,6 @@ Current architecture:
   - `NUTRIENT:xx.xx`
 
 ### ESP32
-- Reads DS18B20 water temperature on `GPIO 4`
 - Receives Nano serial data on `GPIO 16`
 - Drives 5 relays on GPIO outputs
 - Publishes telemetry to MQTT and Firebase
@@ -59,12 +58,6 @@ Current architecture:
 - `GND` -> Nano `GND`
 
 ## ESP32 Wiring
-### DS18B20 Water Temperature Sensor
-- `DATA` -> ESP32 `GPIO 4`
-- `VDD` -> ESP32 `3.3V`
-- `GND` -> ESP32 `GND`
-- Add a `4.7k` resistor between `DATA` and `3.3V`
-
 ### Nano To ESP32 UART
 - Nano `TX` -> ESP32 `GPIO 16` through a voltage divider or logic level shifter
 - Nano `GND` -> ESP32 `GND`
@@ -95,7 +88,6 @@ All grounds must be connected together:
 - pH sensor `GND`
 - TDS sensor `GND`
 - all ultrasonic sensor `GND` pins
-- DS18B20 `GND`
 
 Without common ground, UART and sensor readings will not be reliable.
 
@@ -190,8 +182,6 @@ Meaning:
 - `ESP32Servo`
 - `WebSockets`
 - `PubSubClient`
-- `OneWire`
-- `DallasTemperature`
 
 ## Troubleshooting
 ### Nano upload says port access denied
@@ -199,9 +189,6 @@ Meaning:
 - Close any serial terminal using the Nano COM port
 - Replug the board
 - Re-select the COM port
-
-### ESP32 compile says `OneWire.h` not found
-- Install the `OneWire` library in Arduino IDE
 
 ### ESP32 receives no pH/TDS/level data
 - Check Nano is powered and running

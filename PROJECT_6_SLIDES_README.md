@@ -28,7 +28,6 @@ Main hardware parts:
 - pH Up tank level sensor.
 - pH Down tank level sensor.
 - Nutrient tank level sensor.
-- DS18B20 water temperature sensor on ESP32.
 - Relay outputs for dosing and water movement.
 - Fish feeder servo on GPIO 23.
 
@@ -44,7 +43,6 @@ The Arduino Nano continuously prints sensor readings over serial at 115200 baud.
 The ESP32 listens to this serial stream and builds a live telemetry snapshot.
 
 The ESP32 sends:
-- Temperature.
 - pH.
 - TDS.
 - Fish tank water level.

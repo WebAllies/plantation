@@ -1298,20 +1298,11 @@ class _DashboardPageState extends State<DashboardPage> {
                     : activeFrame.relayStates.entries
                           .map((e) => '${e.key}: ${e.value ? "ON" : "OFF"}')
                           .join('\n'));
-            final fishToFilterOn =
-                activeFrame.relayStates['fishToFilter'] ??
-                activeFrame.relayStates['fish_to_filter'] ??
-                false;
             final feederRunning =
                 activeFrame.relayStates['fishFeeder'] ??
                 activeFrame.relayStates['fish_feeder'] ??
                 false;
 
-            final tempTrend = _trendLabel(
-              activeFrame.temperatureC,
-              low: 18,
-              high: 28,
-            );
             final phTrend = _trendLabel(activeFrame.ph, low: 6.0, high: 7.5);
             final waterTrend = _trendLabel(
               activeFrame.waterLevelPct,
@@ -1420,13 +1411,6 @@ class _DashboardPageState extends State<DashboardPage> {
                         iconColor: const Color(0xFF2E7D32),
                       ),
                       _dashboardMetricCard(
-                        icon: Icons.thermostat,
-                        title: 'Water Temperature',
-                        value: _fmtDouble(activeFrame.temperatureC, '°C'),
-                        trend: tempTrend,
-                        iconColor: const Color(0xFF2E7D32),
-                      ),
-                      _dashboardMetricCard(
                         icon: Icons.local_drink_outlined,
                         title: 'pH Up Tank',
                         value: _fmtDouble(activeFrame.phUpTankLevelPct, '%'),
@@ -1510,14 +1494,6 @@ class _DashboardPageState extends State<DashboardPage> {
                           icon: deviceOnline ? Icons.wifi : Icons.wifi_off,
                           label: 'ESP: ${deviceOnline ? 'ONLINE' : 'OFFLINE'}',
                           active: deviceOnline,
-                        ),
-                        _statusChip(
-                          icon: fishToFilterOn
-                              ? Icons.water_drop
-                              : Icons.water_drop_outlined,
-                          label:
-                              'Fish to filter: ${fishToFilterOn ? 'ON' : 'OFF'}',
-                          active: fishToFilterOn,
                         ),
                         _statusChip(
                           icon: feederRunning

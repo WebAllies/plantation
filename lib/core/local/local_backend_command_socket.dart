@@ -32,6 +32,8 @@ class LocalBackendCommandSocket {
   /// predates WebSocket command support (it simply never acks).
   static const Duration _ackTimeout = Duration(milliseconds: 1200);
   final Map<String, Completer<bool>> _pendingAcks = <String, Completer<bool>>{};
+  final StreamController<Map<String, dynamic>> _commandEvents =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   /// Per-connection capability: null = unknown (probe), true = backend acks WS
   /// commands, false = it doesn't (skip WS, go straight to HTTP). Reset on each
@@ -39,6 +41,7 @@ class LocalBackendCommandSocket {
   bool? _wsCommandsSupported;
 
   bool get isConnected => _connected;
+  Stream<Map<String, dynamic>> get commandEvents => _commandEvents.stream;
 
   /// Opens (or reuses) a connection scoped to [deviceId]. Safe to call often —
   /// it no-ops when already connected to the same device.
@@ -157,6 +160,15 @@ class LocalBackendCommandSocket {
       return;
     }
     if (decoded is! Map) return;
+
+    if (decoded['type'] == 'command') {
+      final payload = decoded['payload'];
+      if (payload is Map) {
+        _commandEvents.add(Map<String, dynamic>.from(payload));
+      }
+      return;
+    }
+
     if (decoded['type'] != 'command_result') return;
 
     // Receiving any command_result proves the backend supports WS commands.

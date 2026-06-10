@@ -19,6 +19,7 @@ class WsHub {
     this.logger = logger;
     this.wss = new WebSocketServer({ server, path: '/ws' });
     this.clients = new Map();
+    this.deviceSockets = new Map();
   }
 
   // The MQTT broker is created after the hub, so it is attached afterwards.
@@ -30,6 +31,7 @@ class WsHub {
     this.wss.on('connection', async (socket, req) => {
       const url = new URL(req.url, 'http://localhost');
       const deviceId = url.searchParams.get('deviceId') || '';
+      const role = url.searchParams.get('role') || 'app';
       let user = null;
 
       try {
@@ -39,11 +41,22 @@ class WsHub {
         return;
       }
 
-      this.clients.set(socket, { deviceId, user });
+      this.clients.set(socket, { deviceId, role, user });
+      if (role === 'device' && deviceId) {
+        this.deviceSockets.set(deviceId, socket);
+        this.db.updateDeviceStatus(deviceId, {
+          status: 'online',
+          transport: 'websocket',
+          tsEpochMs: Date.now(),
+        }).catch((error) => {
+          this.logger.warn(`[ws] device online update failed: ${error.message || error}`);
+        });
+      }
       socket.send(
         JSON.stringify({
           type: 'hello',
           deviceId: deviceId || null,
+          role,
           serverTime: new Date().toISOString(),
           localBackend: true,
           firebaseLoginUser: user,
@@ -70,10 +83,16 @@ class WsHub {
       socket.on('message', (raw) => this.handleClientMessage(socket, raw));
       socket.on('close', () => {
         clearInterval(heartbeat);
+        if (role === 'device' && deviceId && this.deviceSockets.get(deviceId) === socket) {
+          this.deviceSockets.delete(deviceId);
+        }
         this.clients.delete(socket);
       });
       socket.on('error', () => {
         clearInterval(heartbeat);
+        if (role === 'device' && deviceId && this.deviceSockets.get(deviceId) === socket) {
+          this.deviceSockets.delete(deviceId);
+        }
         this.clients.delete(socket);
       });
     });
@@ -124,7 +143,26 @@ class WsHub {
 
     if (message.type === 'command') {
       await this.handleCommandMessage(socket, message);
+      return;
     }
+
+    if (message.type === 'command_ack') {
+      await this.handleCommandAckMessage(socket, message);
+    }
+  }
+
+  sendDeviceCommand(command) {
+    const socket = this.deviceSockets.get(command.deviceId);
+    if (!socket || socket.readyState !== WebSocket.OPEN) return false;
+
+    socket.send(
+      JSON.stringify({
+        type: 'device_command',
+        command,
+        payload: command,
+      }),
+    );
+    return true;
   }
 
   // Accept device commands over the WebSocket so the app can send them on the
@@ -143,7 +181,13 @@ class WsHub {
       if (this.mqtt) this.mqtt.publishCommand(command);
       this.broadcast('command', command);
       socket.send(
-        JSON.stringify({ type: 'command_result', requestId, ok: true, command }),
+        JSON.stringify({
+          type: 'command_result',
+          requestId,
+          ok: true,
+          command,
+          delivery: 'mqtt',
+        }),
       );
     } catch (error) {
       this.logger.warn(`[ws] command failed: ${error.message || error}`);
@@ -155,6 +199,19 @@ class WsHub {
           error: error.message || String(error),
         }),
       );
+    }
+  }
+
+  async handleCommandAckMessage(socket, message) {
+    const meta = this.clients.get(socket) || {};
+    const deviceId = String(message.deviceId || meta.deviceId || '');
+    if (!deviceId) return;
+
+    try {
+      const command = await this.db.updateCommandFromAck(deviceId, message);
+      if (command) this.broadcast('command', command);
+    } catch (error) {
+      this.logger.warn(`[ws] command ack failed: ${error.message || error}`);
     }
   }
 

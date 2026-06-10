@@ -102,6 +102,28 @@ class LocalMqttBroker {
       },
     );
   }
+
+  publishNanoTelemetry(deviceId, payload) {
+    const topic = `plantation/${deviceId}/nano/telemetry`;
+    const cleanPayload = {};
+    for (const [key, value] of Object.entries(payload || {})) {
+      if (value !== null && value !== undefined) cleanPayload[key] = value;
+    }
+    const encoded = JSON.stringify(cleanPayload);
+    this.broker.publish(
+      {
+        topic,
+        payload: encoded,
+        qos: 1,
+        retain: true,
+      },
+      (error) => {
+        if (error) {
+          this.logger.warn(`[mqtt] nano telemetry publish failed: ${error.message || error}`);
+        }
+      },
+    );
+  }
 }
 
 module.exports = { LocalMqttBroker };

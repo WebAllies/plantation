@@ -2,6 +2,35 @@ const express = require('express');
 const cors = require('cors');
 const { authMiddleware } = require('./auth');
 
+function sanitizeRemovedTemperatureSensor(payload) {
+  const clean = { ...(payload || {}) };
+  delete clean.temperatureC;
+
+  if (typeof clean.nanoError === 'string') {
+    const missingPrefix = 'Windows bridge missing readings:';
+    if (clean.nanoError.startsWith(missingPrefix)) {
+      const missing = clean.nanoError
+        .slice(missingPrefix.length)
+        .split(',')
+        .map((item) => item.trim())
+        .filter((item) => item && item !== 'TEMP');
+      clean.nanoError =
+        missing.length === 0 ? '' : `${missingPrefix} ${missing.join(',')}`;
+    } else if (clean.nanoError.trim() === 'TEMP') {
+      clean.nanoError = '';
+    }
+  }
+
+  if (typeof clean.sensorStatus === 'string') {
+    clean.sensorStatus = clean.sensorStatus
+      .split(',')
+      .filter((part) => !part.trim().startsWith('temp='))
+      .join(',');
+  }
+
+  return clean;
+}
+
 function createHttpApi({ db, hub, mqtt, requireAuth }) {
   const app = express();
 
@@ -63,6 +92,26 @@ function createHttpApi({ db, hub, mqtt, requireAuth }) {
     try {
       const stored = await db.storeTelemetry(req.params.deviceId, req.body || {});
       hub.broadcast('telemetry', stored.payload);
+      res.status(201).json({ readingId: stored.readingId });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/api/devices/:deviceId/nano-telemetry', async (req, res, next) => {
+    try {
+      const payload = {
+        ...sanitizeRemovedTemperatureSensor(req.body || {}),
+        deviceId: req.params.deviceId,
+        source: 'nano_usb_bridge',
+        nanoOnline: true,
+        nanoTransport: 'usb_bridge',
+      };
+      const stored = await db.storeTelemetry(req.params.deviceId, payload, {
+        markDeviceOnline: false,
+      });
+      hub.broadcast('telemetry', stored.payload);
+      mqtt.publishNanoTelemetry(req.params.deviceId, stored.payload);
       res.status(201).json({ readingId: stored.readingId });
     } catch (error) {
       next(error);

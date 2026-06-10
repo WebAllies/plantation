@@ -21,8 +21,9 @@ class _AiWeatherPageState extends State<AiWeatherPage> {
   // ✅ WeatherAPI key (Option B)
   static const String kWeatherApiKey = "94bebc8d802a466a90f160222262702";
 
-  final TextEditingController _locationCtrl =
-      TextEditingController(text: "Mauritius");
+  final TextEditingController _locationCtrl = TextEditingController(
+    text: "Mauritius",
+  );
 
   bool _loading = false;
   String? _error;
@@ -85,25 +86,25 @@ class _AiWeatherPageState extends State<AiWeatherPage> {
   }
 
   // ---------- Auto mode binding ----------
-void _bindAutoMode() {
-  _autoModeSub?.cancel();
-  _autoModeSub = _autoModeDoc().snapshots().listen(
-    (snap) {
-      final enabled = (snap.data()?["enabled"] == true);
-      if (!mounted) return;
-      setState(() => _autoModeEnabled = enabled);
-    },
-    onError: (e) {
-      if (!mounted) return;
-      setState(() => _autoModeEnabled = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("No permission for Auto Mode settings."),
-        ),
-      );
-    },
-  );
-}
+  void _bindAutoMode() {
+    _autoModeSub?.cancel();
+    _autoModeSub = _autoModeDoc().snapshots().listen(
+      (snap) {
+        final enabled = (snap.data()?["enabled"] == true);
+        if (!mounted) return;
+        setState(() => _autoModeEnabled = enabled);
+      },
+      onError: (e) {
+        if (!mounted) return;
+        setState(() => _autoModeEnabled = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("No permission for Auto Mode settings."),
+          ),
+        );
+      },
+    );
+  }
 
   Future<void> _setAutoMode(bool enabled) async {
     final email = FirebaseAuth.instance.currentUser?.email ?? "unknown";
@@ -167,13 +168,13 @@ void _bindAutoMode() {
           .doc(kDeviceId)
           .collection("weather_history")
           .add({
-        "ts": FieldValue.serverTimestamp(),
-        "locationName": snapshot.locationName,
-        "maxTempC": snapshot.maxTempC,
-        "chanceOfRain": snapshot.chanceOfRain,
-        "precipMm": snapshot.totalPrecipMm,
-        "source": "WeatherAPI",
-      });
+            "ts": FieldValue.serverTimestamp(),
+            "locationName": snapshot.locationName,
+            "maxTempC": snapshot.maxTempC,
+            "chanceOfRain": snapshot.chanceOfRain,
+            "precipMm": snapshot.totalPrecipMm,
+            "source": "WeatherAPI",
+          });
 
       if (!mounted) return;
       setState(() => _latest = snapshot);
@@ -183,12 +184,12 @@ void _bindAutoMode() {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error =
-            "Failed to fetch weather. Showing cached data (if any).\n$e";
+        _error = "Failed to fetch weather. Showing cached data (if any).\n$e";
       });
     } finally {
-      if (!mounted) return;
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -196,7 +197,8 @@ void _bindAutoMode() {
   WeatherDecision _decide(WeatherSnapshot w) {
     final actions = <WeatherAction>[];
 
-    final rainExpected = (w.chanceOfRain >= rainChanceThreshold) ||
+    final rainExpected =
+        (w.chanceOfRain >= rainChanceThreshold) ||
         (w.totalPrecipMm >= rainMmThreshold);
 
     final heatExpected = w.maxTempC >= highTempThreshold;
@@ -207,8 +209,8 @@ void _bindAutoMode() {
           title: "Reduce irrigation",
           detail:
               "Rain likely (${w.chanceOfRain.toStringAsFixed(0)}% / ${w.totalPrecipMm.toStringAsFixed(1)}mm). Reduce/stop irrigation.",
-          commandType: "fish_to_filter",
-          targetState: false,
+          commandType: null,
+          targetState: null,
         ),
       );
     }
@@ -219,8 +221,8 @@ void _bindAutoMode() {
           title: "Increase water circulation",
           detail:
               "High temperature forecast (${w.maxTempC.toStringAsFixed(1)}°C). Increase pump circulation.",
-          commandType: "fish_to_filter",
-          targetState: true,
+          commandType: null,
+          targetState: null,
         ),
       );
     }
@@ -251,8 +253,9 @@ void _bindAutoMode() {
     }
 
     final decision = _decide(snapshot);
-    final actionable =
-        decision.actions.where((a) => a.commandType != null).toList();
+    final actionable = decision.actions
+        .where((a) => a.commandType != null)
+        .toList();
 
     if (actionable.isEmpty) {
       await _schedulerLogsRef().add({
@@ -367,7 +370,9 @@ void _bindAutoMode() {
       child: ListTile(
         leading: const Icon(Icons.auto_mode),
         title: const Text("Auto Weather Mode"),
-        subtitle: const Text("When ON: writes commands based on forecast rules"),
+        subtitle: const Text(
+          "When ON: writes commands based on forecast rules",
+        ),
         trailing: Switch(
           value: _autoModeEnabled,
           onChanged: (v) => _setAutoMode(v),
@@ -383,8 +388,10 @@ void _bindAutoMode() {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Forecast Source (WeatherAPI)",
-                style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              "Forecast Source (WeatherAPI)",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 10),
             TextField(
               controller: _locationCtrl,
@@ -514,12 +521,13 @@ void _bindAutoMode() {
   }
 
   Future<void> _applyManual(WeatherDecision decision) async {
-    final actionable =
-        decision.actions.where((a) => a.commandType != null).toList();
+    final actionable = decision.actions
+        .where((a) => a.commandType != null)
+        .toList();
     if (actionable.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Nothing to apply.")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Nothing to apply.")));
       return;
     }
 
@@ -568,8 +576,10 @@ void _bindAutoMode() {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(a.title,
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  a.title,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 2),
                 Text(a.detail),
               ],
@@ -618,8 +628,7 @@ class WeatherSnapshot {
 
     final name = (loc["name"] ?? "").toString();
     final region = (loc["region"] ?? "").toString();
-    final locationName =
-        region.trim().isEmpty ? name : "$name, $region";
+    final locationName = region.trim().isEmpty ? name : "$name, $region";
 
     return WeatherSnapshot(
       locationName: locationName.trim().isEmpty ? "Unknown" : locationName,

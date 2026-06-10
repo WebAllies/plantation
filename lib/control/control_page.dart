@@ -37,6 +37,24 @@ class _ControlPageState extends State<ControlPage> {
   static const List<int> _doseDurationsSec = [3, 5, 10];
   final Set<String> _dosingRelays = <String>{};
   final Map<String, Timer> _doseTimers = <String, Timer>{};
+  String? _controlModeOverrideDeviceId;
+  String? _controlModeOverride;
+  StreamSubscription<Map<String, dynamic>>? _commandEventsSub;
+  String? _liveCommandDeviceId;
+  String? _liveCommandStatus;
+  String? _liveCommandType;
+  String? _liveCommandMessage;
+  String? _liveRelaySummary;
+  DateTime? _liveCommandAt;
+  Map<String, bool> _liveRelayStates = const <String, bool>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _commandEventsSub = LocalBackendCommandSocket.instance.commandEvents.listen(
+      _onCommandEvent,
+    );
+  }
 
   @override
   void dispose() {
@@ -57,7 +75,128 @@ class _ControlPageState extends State<ControlPage> {
       }
     }
     _doseTimers.clear();
+    _commandEventsSub?.cancel();
     super.dispose();
+  }
+
+  void _onCommandEvent(Map<String, dynamic> event) {
+    final deviceId = (event['deviceId'] ?? '').toString();
+    if (deviceId.isEmpty || deviceId != widget.selectedDeviceId) return;
+
+    final relayStates = _toBoolMap(event['relayStates']);
+    if (!mounted) return;
+    setState(() {
+      _liveCommandDeviceId = deviceId;
+      _liveCommandStatus = (event['status'] ?? '').toString();
+      _liveCommandType = (event['type'] ?? '').toString();
+      _liveCommandMessage = (event['message'] ?? '').toString();
+      _liveRelaySummary = (event['relaySummary'] ?? '').toString();
+      _liveCommandAt = DateTime.now();
+      if (relayStates.isNotEmpty) {
+        _liveRelayStates = relayStates;
+      }
+    });
+  }
+
+  Map<String, bool> _toBoolMap(dynamic value) {
+    if (value is! Map) return const <String, bool>{};
+    final out = <String, bool>{};
+    for (final entry in value.entries) {
+      final raw = entry.value;
+      final boolValue = raw is bool
+          ? raw
+          : raw is num
+          ? raw != 0
+          : raw.toString().toLowerCase() == 'true';
+      out[entry.key.toString()] = boolValue;
+    }
+    return out;
+  }
+
+  String _commandLabel(String? type) {
+    switch (type) {
+      case 'ph_up':
+        return 'pH Up Relay';
+      case 'ph_down':
+        return 'pH Down Relay';
+      case 'nutrient':
+        return 'Nutrient Relay';
+      case 'fish_feeder':
+        return 'Fish Feeder';
+      default:
+        return type == null || type.isEmpty ? 'Command' : type;
+    }
+  }
+
+  Widget _liveCommandCard() {
+    final status = _liveCommandStatus;
+    if (_liveCommandDeviceId != widget.selectedDeviceId ||
+        status == null ||
+        status.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final lowerStatus = status.toLowerCase();
+    final isExecuting = lowerStatus == 'pending' || lowerStatus == 'executing';
+    final isFailed = lowerStatus == 'failed';
+    final Color color = isFailed
+        ? Colors.red
+        : isExecuting
+        ? Colors.orange
+        : Colors.green;
+    final Color iconColor = isFailed
+        ? Colors.red.shade700
+        : isExecuting
+        ? Colors.orange.shade800
+        : Colors.green.shade700;
+    final icon = isFailed
+        ? Icons.error_outline
+        : isExecuting
+        ? Icons.sync
+        : Icons.check_circle_outline;
+    final seenAgo = _liveCommandAt == null
+        ? ''
+        : 'Updated ${DateTime.now().difference(_liveCommandAt!).inSeconds}s ago';
+    final message = _liveCommandMessage == null || _liveCommandMessage!.isEmpty
+        ? (_liveRelaySummary == null || _liveRelaySummary!.isEmpty
+              ? seenAgo
+              : _liveRelaySummary!)
+        : _liveCommandMessage!;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: color.withValues(alpha: 0.10),
+          border: Border.all(color: color.withValues(alpha: 0.65), width: 0.8),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: iconColor),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${_commandLabel(_liveCommandType)} ${status.toUpperCase()}',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    seenAgo.isEmpty ? message : '$message • $seenAgo',
+                    style: TextStyle(color: Colors.grey.shade800),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _sendCommand({
@@ -76,9 +215,9 @@ class _ControlPageState extends State<ControlPage> {
     );
     if (sentWs) {
       if (announce && mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("${type.toUpperCase()} sent")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("${_commandLabel(type)} queued to MQTT")),
+        );
       }
       return;
     }
@@ -250,30 +389,96 @@ class _ControlPageState extends State<ControlPage> {
     required String deviceId,
     required String mode, // "manual" or "auto"
   }) async {
+    setState(() {
+      _controlModeOverrideDeviceId = deviceId;
+      _controlModeOverride = mode;
+    });
+
     final sentLocal = await _localBackend.patchDevice(
       deviceId: deviceId,
       controlMode: mode,
     );
-    if (sentLocal) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            "Automation mode queued on server: ${mode.toUpperCase()}",
-          ),
-        ),
-      );
-      return;
-    }
 
-    await FirebaseFirestore.instance.collection('devices').doc(deviceId).set({
-      'controlMode': mode,
-      'controlModeUpdatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    var sentFirebase = false;
+    try {
+      await FirebaseFirestore.instance.collection('devices').doc(deviceId).set({
+        'controlMode': mode,
+        'controlModeUpdatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      sentFirebase = true;
+    } catch (_) {
+      sentFirebase = false;
+    }
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Automation mode: ${mode.toUpperCase()}")),
+      SnackBar(
+        content: Text(
+          sentLocal || sentFirebase
+              ? "Control mode: ${mode.toUpperCase()}"
+              : "Could not save control mode. Check connection.",
+        ),
+      ),
+    );
+  }
+
+  Widget _controlModeCard({required String deviceId, required bool isAuto}) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Control Mode",
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              isAuto
+                  ? "AUTO mode is active. Manual relay controls are locked."
+                  : "MANUAL mode is active. You can control relays now.",
+              style: TextStyle(color: Colors.grey.shade700),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: isAuto
+                      ? OutlinedButton.icon(
+                          onPressed: () => _setControlMode(
+                            deviceId: deviceId,
+                            mode: 'manual',
+                          ),
+                          icon: const Icon(Icons.pan_tool_alt_outlined),
+                          label: const Text("Manual"),
+                        )
+                      : FilledButton.icon(
+                          onPressed: null,
+                          icon: const Icon(Icons.pan_tool_alt),
+                          label: const Text("Manual"),
+                        ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: isAuto
+                      ? FilledButton.icon(
+                          onPressed: null,
+                          icon: const Icon(Icons.auto_mode),
+                          label: const Text("Auto"),
+                        )
+                      : OutlinedButton.icon(
+                          onPressed: () =>
+                              _setControlMode(deviceId: deviceId, mode: 'auto'),
+                          icon: const Icon(Icons.auto_mode_outlined),
+                          label: const Text("Auto"),
+                        ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -379,17 +584,27 @@ class _ControlPageState extends State<ControlPage> {
           final d = snap.data!.data() as Map<String, dynamic>;
 
           final relayStates = (d['relayStates'] is Map<String, dynamic>)
-              ? (d['relayStates'] as Map<String, dynamic>)
+              ? <String, dynamic>{...d['relayStates'] as Map<String, dynamic>}
               : <String, dynamic>{};
-          final phUpState = relayStates['phUp'] == true;
-          final phDownState = relayStates['phDown'] == true;
-          final nutrientState = relayStates['nutrient'] == true;
-          final fishToFilterState = relayStates['fishToFilter'] == true;
-          final feederState = relayStates['fishFeeder'] == true;
+          if (_liveCommandDeviceId == deviceId && _liveRelayStates.isNotEmpty) {
+            relayStates.addAll(_liveRelayStates);
+          }
+          bool relayOn(String camelKey, [String? snakeKey]) =>
+              relayStates[camelKey] == true ||
+              (snakeKey != null && relayStates[snakeKey] == true);
+          final phUpState = relayOn('phUp', 'ph_up');
+          final phDownState = relayOn('phDown', 'ph_down');
+          final nutrientState = relayOn('nutrient');
+          final feederState = relayOn('fishFeeder', 'fish_feeder');
 
           // New fields
-          final controlMode = (d['controlMode'] ?? 'manual')
-              .toString(); // manual/auto
+          final firestoreControlMode = (d['controlMode'] ?? 'manual')
+              .toString();
+          final controlMode =
+              _controlModeOverrideDeviceId == deviceId &&
+                  _controlModeOverride != null
+              ? _controlModeOverride!
+              : firestoreControlMode;
           final isAuto = controlMode == 'auto';
 
           // Telemetry (your simulator has it)
@@ -456,21 +671,8 @@ class _ControlPageState extends State<ControlPage> {
             padding: const EdgeInsets.all(16),
             children: [
               // ===== Automation Mode =====
-              Card(
-                child: SwitchListTile(
-                  title: const Text("Full Control Automation"),
-                  subtitle: Text(
-                    isAuto
-                        ? "AUTO mode (Firebase drives relay commands)"
-                        : "MANUAL mode (you control relays)",
-                  ),
-                  value: isAuto,
-                  onChanged: (v) => _setControlMode(
-                    deviceId: deviceId,
-                    mode: v ? 'auto' : 'manual',
-                  ),
-                ),
-              ),
+              _controlModeCard(deviceId: deviceId, isAuto: isAuto),
+              _liveCommandCard(),
 
               // ===== Water LOW banner =====
               if (waterLevelPct != null)
@@ -636,19 +838,6 @@ class _ControlPageState extends State<ControlPage> {
                       trailing: Icon(isAuto ? Icons.lock : Icons.tune),
                     ),
                     const Divider(height: 1),
-
-                    SwitchListTile(
-                      title: const Text("Fish Tank To Filter Bed"),
-                      subtitle: Text(fishToFilterState ? "ON" : "OFF"),
-                      value: fishToFilterState,
-                      onChanged: isAuto
-                          ? null
-                          : (v) => _sendCommand(
-                              deviceId: deviceId,
-                              type: 'fish_to_filter',
-                              targetState: v,
-                            ),
-                    ),
 
                     SwitchListTile(
                       title: const Text("pH Up Relay"),
