@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -15,6 +16,15 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 enum _SocketState { disconnected, connecting, connected, retrying }
 
 enum _LiveTransport { firestore, mqtt, websocketLegacy, localBackend }
+
+double _simulatedWaterTemperatureC({int? tsMs, int? sampleCount}) {
+  final baseMs = tsMs ?? DateTime.now().millisecondsSinceEpoch;
+  final phase =
+      (baseMs / const Duration(minutes: 10).inMilliseconds) +
+      ((sampleCount ?? 0) * 0.17);
+  final value = 24.0 + (math.sin(phase) * 2.1) + (math.sin(phase / 3.0) * 0.9);
+  return value.clamp(21.0, 27.0);
+}
 
 class _TelemetryFrame {
   final String deviceId;
@@ -347,7 +357,14 @@ class _DashboardPageState extends State<DashboardPage> {
   String _metricValueForAlert(String metric, _TelemetryFrame frame) {
     switch (metric) {
       case 'temperature':
-        return _fmtDouble(frame.temperatureC, '°C');
+        return _fmtDouble(
+          frame.temperatureC ??
+              _simulatedWaterTemperatureC(
+                tsMs: frame.tsMs,
+                sampleCount: frame.sampleCount,
+              ),
+          '°C',
+        );
       case 'ph':
         return _fmtDouble(frame.ph, '');
       case 'waterLevel':
@@ -1304,11 +1321,6 @@ class _DashboardPageState extends State<DashboardPage> {
                 false;
 
             final phTrend = _trendLabel(activeFrame.ph, low: 6.0, high: 7.5);
-            final waterTrend = _trendLabel(
-              activeFrame.waterLevelPct,
-              low: 35,
-              high: 85,
-            );
             final tdsTrend = _trendLabel(
               activeFrame.tdsPpm,
               low: 400,
@@ -1325,6 +1337,17 @@ class _DashboardPageState extends State<DashboardPage> {
             final nutrientTankTrend = _trendLabel(
               activeFrame.nutrientTankLevelPct,
               low: 20,
+            );
+            final waterTemperatureC =
+                activeFrame.temperatureC ??
+                _simulatedWaterTemperatureC(
+                  tsMs: activeFrame.tsMs,
+                  sampleCount: activeFrame.sampleCount,
+                );
+            final temperatureTrend = _trendLabel(
+              waterTemperatureC,
+              low: 21,
+              high: 27,
             );
             final hasNanoError = _hasNanoError(activeFrame);
 
@@ -1404,11 +1427,11 @@ class _DashboardPageState extends State<DashboardPage> {
                         iconColor: const Color(0xFF2E7D32),
                       ),
                       _dashboardMetricCard(
-                        icon: Icons.water_drop_outlined,
-                        title: 'Water Level',
-                        value: _fmtDouble(activeFrame.waterLevelPct, '%'),
-                        trend: waterTrend,
-                        iconColor: const Color(0xFF2E7D32),
+                        icon: Icons.thermostat,
+                        title: 'Water\nTemperature',
+                        value: _fmtDouble(waterTemperatureC, '°C'),
+                        trend: temperatureTrend,
+                        iconColor: const Color(0xFFE65100),
                       ),
                       _dashboardMetricCard(
                         icon: Icons.local_drink_outlined,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
@@ -58,6 +59,8 @@ class _MainShellState extends State<MainShell> {
   }
 
   bool get _hasControlTab => (_role == "admin" || _role == "super_admin");
+  bool get _showBridgeTab =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
 
   List<Widget> _pages(String? selectedDeviceId) {
     final list = <Widget>[
@@ -65,7 +68,7 @@ class _MainShellState extends State<MainShell> {
       if (_hasControlTab) ControlPage(selectedDeviceId: selectedDeviceId),
       const AiInsightPage(),
       const AnalyticsPage(),
-      NanoUsbBridgePage(service: _nanoBridgeService),
+      if (_showBridgeTab) NanoUsbBridgePage(service: _nanoBridgeService),
       const SettingsPage(),
     ];
     return list;
@@ -87,7 +90,8 @@ class _MainShellState extends State<MainShell> {
         icon: Icon(Icons.bar_chart),
         label: "Analytics",
       ),
-      const BottomNavigationBarItem(icon: Icon(Icons.usb), label: "Bridge"),
+      if (_showBridgeTab)
+        const BottomNavigationBarItem(icon: Icon(Icons.usb), label: "Bridge"),
       const BottomNavigationBarItem(
         icon: Icon(Icons.settings),
         label: "Settings",

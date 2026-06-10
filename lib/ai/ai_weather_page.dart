@@ -6,21 +6,20 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:iot_aqua_app/core/device/device_selector_header.dart';
+import 'package:iot_aqua_app/core/device/device_selection_controller.dart';
+import 'package:provider/provider.dart';
 
 class AiWeatherPage extends StatefulWidget {
-  const AiWeatherPage({super.key});
+  const AiWeatherPage({super.key, this.selectedDeviceId});
+
+  final String? selectedDeviceId;
 
   @override
   State<AiWeatherPage> createState() => _AiWeatherPageState();
 }
 
 class _AiWeatherPageState extends State<AiWeatherPage> {
-  // ✅ device id (you can later replace with your device selector value)
-  static const String kDeviceId = "esp32_sim_01";
-
-  // ✅ WeatherAPI key (Option B)
-  static const String kWeatherApiKey = "94bebc8d802a466a90f160222262702";
-
   final TextEditingController _locationCtrl = TextEditingController(
     text: "Mauritius",
   );
@@ -39,12 +38,13 @@ class _AiWeatherPageState extends State<AiWeatherPage> {
   bool _autoModeEnabled = false;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _autoModeSub;
   DateTime? _lastAutoRunAt;
+  String? _boundDeviceId;
+  bool _autoModePermissionDenied = false;
+  String? _syncNote;
 
   @override
   void initState() {
     super.initState();
-    _bindAutoMode();
-    _loadCachedThenFetch();
   }
 
   @override
@@ -54,41 +54,69 @@ class _AiWeatherPageState extends State<AiWeatherPage> {
     super.dispose();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final selected =
+        widget.selectedDeviceId ??
+        context.watch<DeviceSelectionController>().selectedDeviceId;
+    if (selected != null && selected.isNotEmpty && selected != _boundDeviceId) {
+      _bindDevice(selected);
+    }
+  }
+
+  void _bindDevice(String deviceId) {
+    _boundDeviceId = deviceId;
+    _autoModeSub?.cancel();
+    _lastAutoRunAt = null;
+    _latest = null;
+    _error = null;
+    _autoModeEnabled = false;
+    _autoModePermissionDenied = false;
+    _syncNote = null;
+    _bindAutoMode(deviceId);
+    unawaited(_loadCachedThenFetch(deviceId));
+  }
+
+  bool _isPermissionDenied(Object error) {
+    return error is FirebaseException && error.code == 'permission-denied';
+  }
+
   // ---------- Firestore refs ----------
-  DocumentReference<Map<String, dynamic>> _cacheDoc() {
+  DocumentReference<Map<String, dynamic>> _cacheDoc(String deviceId) {
     return FirebaseFirestore.instance
         .collection("devices")
-        .doc(kDeviceId)
+        .doc(deviceId)
         .collection("weather")
         .doc("latest");
   }
 
-  DocumentReference<Map<String, dynamic>> _autoModeDoc() {
+  DocumentReference<Map<String, dynamic>> _autoModeDoc(String deviceId) {
     return FirebaseFirestore.instance
         .collection("devices")
-        .doc(kDeviceId)
+        .doc(deviceId)
         .collection("settings")
         .doc("automation");
   }
 
-  CollectionReference<Map<String, dynamic>> _schedulerLogsRef() {
+  CollectionReference<Map<String, dynamic>> _schedulerLogsRef(String deviceId) {
     return FirebaseFirestore.instance
         .collection("devices")
-        .doc(kDeviceId)
+        .doc(deviceId)
         .collection("scheduler_logs");
   }
 
-  CollectionReference<Map<String, dynamic>> _commandsRef() {
+  CollectionReference<Map<String, dynamic>> _commandsRef(String deviceId) {
     return FirebaseFirestore.instance
         .collection("devices")
-        .doc(kDeviceId)
+        .doc(deviceId)
         .collection("commands");
   }
 
   // ---------- Auto mode binding ----------
-  void _bindAutoMode() {
+  void _bindAutoMode(String deviceId) {
     _autoModeSub?.cancel();
-    _autoModeSub = _autoModeDoc().snapshots().listen(
+    _autoModeSub = _autoModeDoc(deviceId).snapshots().listen(
       (snap) {
         final enabled = (snap.data()?["enabled"] == true);
         if (!mounted) return;
@@ -96,44 +124,72 @@ class _AiWeatherPageState extends State<AiWeatherPage> {
       },
       onError: (e) {
         if (!mounted) return;
-        setState(() => _autoModeEnabled = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("No permission for Auto Mode settings."),
-          ),
-        );
+        setState(() {
+          _autoModeEnabled = false;
+          _autoModePermissionDenied = _isPermissionDenied(e);
+          _syncNote = _autoModePermissionDenied
+              ? "Weather forecast works, but Auto Weather Mode settings cannot sync for this account."
+              : "Auto Weather Mode settings are unavailable right now.";
+        });
       },
     );
   }
 
   Future<void> _setAutoMode(bool enabled) async {
+    final deviceId = _boundDeviceId;
+    if (deviceId == null) return;
     final email = FirebaseAuth.instance.currentUser?.email ?? "unknown";
-    await _autoModeDoc().set({
-      "enabled": enabled,
-      "updatedAt": FieldValue.serverTimestamp(),
-      "updatedBy": email,
-    }, SetOptions(merge: true));
+    try {
+      await _autoModeDoc(deviceId).set({
+        "enabled": enabled,
+        "updatedAt": FieldValue.serverTimestamp(),
+        "updatedBy": email,
+      }, SetOptions(merge: true));
+      _autoModePermissionDenied = false;
+      _syncNote = null;
+    } catch (e) {
+      if (!_isPermissionDenied(e)) rethrow;
+      _autoModePermissionDenied = true;
+      _syncNote =
+          "Auto Weather Mode is local only for this session because Firestore permission was denied.";
+    }
 
     if (!mounted) return;
     setState(() => _autoModeEnabled = enabled);
 
     // Optional: run immediately if turned on and we already have forecast
     if (enabled && _latest != null) {
-      await _runAutoIfEnabled(_latest!);
+      await _runAutoIfEnabled(deviceId, _latest!);
     }
   }
 
   // ---------- Load cache then fetch ----------
-  Future<void> _loadCachedThenFetch() async {
-    final snap = await _cacheDoc().get();
-    if (snap.exists && snap.data() != null) {
-      setState(() => _latest = WeatherSnapshot.fromFirestore(snap.data()!));
+  Future<void> _loadCachedThenFetch(String deviceId) async {
+    try {
+      final snap = await _cacheDoc(deviceId).get();
+      if (snap.exists && snap.data() != null) {
+        if (!mounted || _boundDeviceId != deviceId) return;
+        setState(() => _latest = WeatherSnapshot.fromFirestore(snap.data()!));
+      }
+    } catch (e) {
+      if (!_isPermissionDenied(e)) rethrow;
+      if (mounted && _boundDeviceId == deviceId) {
+        setState(() {
+          _syncNote =
+              "Weather cache is not readable for this account. Live forecast will still load.";
+        });
+      }
     }
     await _fetchWeather();
   }
 
   // ---------- Fetch weather ----------
   Future<void> _fetchWeather() async {
+    final deviceId = _boundDeviceId;
+    if (deviceId == null || deviceId.isEmpty) {
+      setState(() => _error = "No device selected. Pick a device first.");
+      return;
+    }
     final loc = _locationCtrl.text.trim();
     if (loc.isEmpty) return;
 
@@ -143,44 +199,45 @@ class _AiWeatherPageState extends State<AiWeatherPage> {
     });
 
     try {
-      final uri = Uri.parse(
-        "https://api.weatherapi.com/v1/forecast.json"
-        "?key=$kWeatherApiKey"
-        "&q=${Uri.encodeComponent(loc)}"
-        "&days=1"
-        "&aqi=no&alerts=no",
-      );
-
-      final res = await http.get(uri);
-      if (res.statusCode != 200) {
-        throw Exception("WeatherAPI error: ${res.statusCode} ${res.body}");
-      }
-
-      final data = jsonDecode(res.body) as Map<String, dynamic>;
-      final snapshot = WeatherSnapshot.fromWeatherApi(data);
-
-      // ✅ cache latest
-      await _cacheDoc().set(snapshot.toFirestore(), SetOptions(merge: true));
-
-      // ✅ save history for analytics
-      await FirebaseFirestore.instance
-          .collection("devices")
-          .doc(kDeviceId)
-          .collection("weather_history")
-          .add({
-            "ts": FieldValue.serverTimestamp(),
-            "locationName": snapshot.locationName,
-            "maxTempC": snapshot.maxTempC,
-            "chanceOfRain": snapshot.chanceOfRain,
-            "precipMm": snapshot.totalPrecipMm,
-            "source": "WeatherAPI",
-          });
-
-      if (!mounted) return;
+      final snapshot = await _fetchOpenMeteo(loc);
+      if (!mounted || _boundDeviceId != deviceId) return;
       setState(() => _latest = snapshot);
 
+      // ✅ cache latest
+      try {
+        await _cacheDoc(
+          deviceId,
+        ).set(snapshot.toFirestore(), SetOptions(merge: true));
+      } catch (e) {
+        if (!_isPermissionDenied(e)) rethrow;
+        if (mounted) {
+          setState(() {
+            _syncNote =
+                "Forecast loaded, but it could not be saved to Firestore for this account.";
+          });
+        }
+      }
+
+      // ✅ save history for analytics
+      try {
+        await FirebaseFirestore.instance
+            .collection("devices")
+            .doc(deviceId)
+            .collection("weather_history")
+            .add({
+              "ts": FieldValue.serverTimestamp(),
+              "locationName": snapshot.locationName,
+              "maxTempC": snapshot.maxTempC,
+              "chanceOfRain": snapshot.chanceOfRain,
+              "precipMm": snapshot.totalPrecipMm,
+              "source": "Open-Meteo",
+            });
+      } catch (e) {
+        if (!_isPermissionDenied(e)) rethrow;
+      }
+
       // ✅ run auto if enabled (anti-spam inside)
-      await _runAutoIfEnabled(snapshot);
+      await _runAutoIfEnabled(deviceId, snapshot);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -191,6 +248,50 @@ class _AiWeatherPageState extends State<AiWeatherPage> {
         setState(() => _loading = false);
       }
     }
+  }
+
+  Future<WeatherSnapshot> _fetchOpenMeteo(String location) async {
+    final geoUri = Uri.https("geocoding-api.open-meteo.com", "/v1/search", {
+      "name": location,
+      "count": "1",
+      "language": "en",
+      "format": "json",
+    });
+    final geoRes = await http.get(geoUri).timeout(const Duration(seconds: 12));
+    if (geoRes.statusCode != 200) {
+      throw Exception("Geocoding failed: HTTP ${geoRes.statusCode}");
+    }
+
+    final geoRoot = jsonDecode(geoRes.body) as Map<String, dynamic>;
+    final results = geoRoot["results"] as List?;
+    if (results == null || results.isEmpty || results.first is! Map) {
+      throw Exception("Location not found: $location");
+    }
+
+    final geo = (results.first as Map).cast<String, dynamic>();
+    final lat = (geo["latitude"] as num?)?.toDouble();
+    final lon = (geo["longitude"] as num?)?.toDouble();
+    if (lat == null || lon == null) {
+      throw Exception("Location coordinates missing for $location");
+    }
+
+    final forecastUri = Uri.https("api.open-meteo.com", "/v1/forecast", {
+      "latitude": lat.toString(),
+      "longitude": lon.toString(),
+      "daily":
+          "temperature_2m_max,precipitation_sum,precipitation_probability_max",
+      "forecast_days": "1",
+      "timezone": "auto",
+    });
+    final forecastRes = await http
+        .get(forecastUri)
+        .timeout(const Duration(seconds: 12));
+    if (forecastRes.statusCode != 200) {
+      throw Exception("Forecast failed: HTTP ${forecastRes.statusCode}");
+    }
+
+    final forecast = jsonDecode(forecastRes.body) as Map<String, dynamic>;
+    return WeatherSnapshot.fromOpenMeteo(geo: geo, forecast: forecast);
   }
 
   // ---------- Decision rules ----------
@@ -242,7 +343,10 @@ class _AiWeatherPageState extends State<AiWeatherPage> {
   }
 
   // ---------- Auto execution ----------
-  Future<void> _runAutoIfEnabled(WeatherSnapshot snapshot) async {
+  Future<void> _runAutoIfEnabled(
+    String deviceId,
+    WeatherSnapshot snapshot,
+  ) async {
     if (!_autoModeEnabled) return;
 
     // Anti-spam: only every 10 minutes
@@ -258,16 +362,20 @@ class _AiWeatherPageState extends State<AiWeatherPage> {
         .toList();
 
     if (actionable.isEmpty) {
-      await _schedulerLogsRef().add({
-        "ts": FieldValue.serverTimestamp(),
-        "mode": "weather_only",
-        "locationName": snapshot.locationName,
-        "maxTempC": snapshot.maxTempC,
-        "chanceOfRain": snapshot.chanceOfRain,
-        "precipMm": snapshot.totalPrecipMm,
-        "actions": ["No changes required"],
-        "executed": false,
-      });
+      try {
+        await _schedulerLogsRef(deviceId).add({
+          "ts": FieldValue.serverTimestamp(),
+          "mode": "weather_only",
+          "locationName": snapshot.locationName,
+          "maxTempC": snapshot.maxTempC,
+          "chanceOfRain": snapshot.chanceOfRain,
+          "precipMm": snapshot.totalPrecipMm,
+          "actions": ["No changes required"],
+          "executed": false,
+        });
+      } catch (e) {
+        if (!_isPermissionDenied(e)) rethrow;
+      }
       _lastAutoRunAt = now;
       return;
     }
@@ -276,29 +384,37 @@ class _AiWeatherPageState extends State<AiWeatherPage> {
     final email = FirebaseAuth.instance.currentUser?.email ?? "unknown";
 
     for (final a in actionable) {
-      await _commandsRef().add({
-        "type": a.commandType, // "pump" | "valve"
-        "targetState": a.targetState,
-        "status": "pending",
-        "requestedBy": uid,
-        "requestedByEmail": email,
-        "requestedAt": FieldValue.serverTimestamp(),
-        "executedAt": null,
-        "message": "Auto Weather Mode: ${a.title}",
-      });
+      try {
+        await _commandsRef(deviceId).add({
+          "type": a.commandType, // "pump" | "valve"
+          "targetState": a.targetState,
+          "status": "pending",
+          "requestedBy": uid,
+          "requestedByEmail": email,
+          "requestedAt": FieldValue.serverTimestamp(),
+          "executedAt": null,
+          "message": "Auto Weather Mode: ${a.title}",
+        });
+      } catch (e) {
+        if (!_isPermissionDenied(e)) rethrow;
+      }
     }
 
-    await _schedulerLogsRef().add({
-      "ts": FieldValue.serverTimestamp(),
-      "mode": "weather_only",
-      "locationName": snapshot.locationName,
-      "maxTempC": snapshot.maxTempC,
-      "chanceOfRain": snapshot.chanceOfRain,
-      "precipMm": snapshot.totalPrecipMm,
-      "actions": actionable.map((a) => a.title).toList(),
-      "executed": true,
-      "commandCount": actionable.length,
-    });
+    try {
+      await _schedulerLogsRef(deviceId).add({
+        "ts": FieldValue.serverTimestamp(),
+        "mode": "weather_only",
+        "locationName": snapshot.locationName,
+        "maxTempC": snapshot.maxTempC,
+        "chanceOfRain": snapshot.chanceOfRain,
+        "precipMm": snapshot.totalPrecipMm,
+        "actions": actionable.map((a) => a.title).toList(),
+        "executed": true,
+        "commandCount": actionable.length,
+      });
+    } catch (e) {
+      if (!_isPermissionDenied(e)) rethrow;
+    }
 
     _lastAutoRunAt = now;
 
@@ -316,10 +432,12 @@ class _AiWeatherPageState extends State<AiWeatherPage> {
   @override
   Widget build(BuildContext context) {
     final w = _latest;
+    final deviceId = _boundDeviceId;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text("Weather AI"),
+        bottom: const DeviceSelectorHeaderBottom(),
         actions: [
           IconButton(
             onPressed: _loading ? null : _fetchWeather,
@@ -331,9 +449,22 @@ class _AiWeatherPageState extends State<AiWeatherPage> {
         padding: const EdgeInsets.all(16),
         child: ListView(
           children: [
+            if (deviceId == null) ...[
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text("No device selected. Pick a device first."),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             _buildLocationCard(),
             const SizedBox(height: 12),
             _buildAutoModeCard(),
+            if (_syncNote != null) ...[
+              const SizedBox(height: 12),
+              _buildInfoCard(_syncNote!),
+            ],
 
             if (_loading) ...[
               const SizedBox(height: 12),
@@ -370,12 +501,31 @@ class _AiWeatherPageState extends State<AiWeatherPage> {
       child: ListTile(
         leading: const Icon(Icons.auto_mode),
         title: const Text("Auto Weather Mode"),
-        subtitle: const Text(
-          "When ON: writes commands based on forecast rules",
+        subtitle: Text(
+          _autoModePermissionDenied
+              ? "Local only: this account cannot sync weather automation settings."
+              : "When ON: writes commands based on forecast rules",
         ),
         trailing: Switch(
           value: _autoModeEnabled,
           onChanged: (v) => _setAutoMode(v),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoCard(String msg) {
+    return Card(
+      color: Colors.blue.shade50,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.info_outline, color: Colors.blue.shade700),
+            const SizedBox(width: 10),
+            Expanded(child: Text(msg)),
+          ],
         ),
       ),
     );
@@ -389,8 +539,13 @@ class _AiWeatherPageState extends State<AiWeatherPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              "Forecast Source (WeatherAPI)",
+              "Forecast Source",
               style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              "Open-Meteo forecast, cached to the selected device",
+              style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
             ),
             const SizedBox(height: 10),
             TextField(
@@ -521,6 +676,13 @@ class _AiWeatherPageState extends State<AiWeatherPage> {
   }
 
   Future<void> _applyManual(WeatherDecision decision) async {
+    final deviceId = _boundDeviceId;
+    if (deviceId == null || deviceId.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("No device selected.")));
+      return;
+    }
     final actionable = decision.actions
         .where((a) => a.commandType != null)
         .toList();
@@ -535,7 +697,7 @@ class _AiWeatherPageState extends State<AiWeatherPage> {
     final email = FirebaseAuth.instance.currentUser?.email ?? "unknown";
 
     for (final a in actionable) {
-      await _commandsRef().add({
+      await _commandsRef(deviceId).add({
         "type": a.commandType,
         "targetState": a.targetState,
         "status": "pending",
@@ -547,7 +709,7 @@ class _AiWeatherPageState extends State<AiWeatherPage> {
       });
     }
 
-    await _schedulerLogsRef().add({
+    await _schedulerLogsRef(deviceId).add({
       "ts": FieldValue.serverTimestamp(),
       "mode": "manual_weather",
       "actions": actionable.map((a) => a.title).toList(),
@@ -636,6 +798,39 @@ class WeatherSnapshot {
       chanceOfRain: toDouble(day0["daily_chance_of_rain"]),
       totalPrecipMm: toDouble(day0["totalprecip_mm"]),
       updatedAt: DateTime.tryParse((loc["localtime"] ?? "").toString()),
+    );
+  }
+
+  factory WeatherSnapshot.fromOpenMeteo({
+    required Map<String, dynamic> geo,
+    required Map<String, dynamic> forecast,
+  }) {
+    double firstDouble(dynamic value) {
+      if (value is List && value.isNotEmpty) {
+        final first = value.first;
+        if (first is num) return first.toDouble();
+        return double.tryParse(first.toString()) ?? 0;
+      }
+      if (value is num) return value.toDouble();
+      return double.tryParse(value?.toString() ?? '') ?? 0;
+    }
+
+    final daily = (forecast["daily"] as Map?)?.cast<String, dynamic>() ?? {};
+    final name = (geo["name"] ?? "").toString();
+    final admin1 = (geo["admin1"] ?? "").toString();
+    final country = (geo["country"] ?? "").toString();
+    final parts = <String>[
+      name,
+      if (admin1.trim().isNotEmpty) admin1,
+      if (country.trim().isNotEmpty) country,
+    ].where((e) => e.trim().isNotEmpty).toList(growable: false);
+
+    return WeatherSnapshot(
+      locationName: parts.isEmpty ? "Unknown" : parts.join(", "),
+      maxTempC: firstDouble(daily["temperature_2m_max"]),
+      chanceOfRain: firstDouble(daily["precipitation_probability_max"]),
+      totalPrecipMm: firstDouble(daily["precipitation_sum"]),
+      updatedAt: DateTime.now(),
     );
   }
 

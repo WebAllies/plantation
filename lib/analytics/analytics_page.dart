@@ -17,6 +17,15 @@ const bool _isFlutterTest = bool.fromEnvironment('FLUTTER_TEST');
 
 enum AnalyticsRange { day24, day7, day30, custom }
 
+double _simulatedWaterTemperatureC({DateTime? timestamp, int? sampleCount}) {
+  final baseMs = (timestamp ?? DateTime.now()).millisecondsSinceEpoch;
+  final phase =
+      (baseMs / const Duration(minutes: 10).inMilliseconds) +
+      ((sampleCount ?? 0) * 0.17);
+  final value = 24.0 + (math.sin(phase) * 2.1) + (math.sin(phase / 3.0) * 0.9);
+  return value.clamp(21.0, 27.0).toDouble();
+}
+
 class AnalyticsPage extends StatefulWidget {
   const AnalyticsPage({super.key, this.selectedDeviceId});
 
@@ -28,8 +37,6 @@ class AnalyticsPage extends StatefulWidget {
 
 class _AnalyticsPageState extends State<AnalyticsPage> {
   final DateFormat _timeFormatter = DateFormat('dd MMM yyyy, HH:mm:ss');
-  final DateFormat _shortTimeFormatter = DateFormat('HH:mm');
-  final DateFormat _shortDateFormatter = DateFormat('dd MMM');
 
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _alertStateSub;
   Timer? _alertReminderTimer;
@@ -86,22 +93,22 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
         .doc('current')
         .snapshots()
         .listen((snap) {
-      final data = snap.data();
-      final rawMetrics = data?['activeMetrics'];
-      final metrics = rawMetrics is Iterable
-          ? rawMetrics
-              .map((e) => e.toString())
-              .where((e) => e.trim().isNotEmpty)
-              .toList(growable: false)
-          : const <String>[];
+          final data = snap.data();
+          final rawMetrics = data?['activeMetrics'];
+          final metrics = rawMetrics is Iterable
+              ? rawMetrics
+                    .map((e) => e.toString())
+                    .where((e) => e.trim().isNotEmpty)
+                    .toList(growable: false)
+              : const <String>[];
 
-      if (!mounted) return;
-      setState(() {
-        _alertStateData = data;
-        _activeAlertMetrics = metrics;
-      });
-      _syncAlertReminderTimer();
-    });
+          if (!mounted) return;
+          setState(() {
+            _alertStateData = data;
+            _activeAlertMetrics = metrics;
+          });
+          _syncAlertReminderTimer();
+        });
   }
 
   void _syncAlertReminderTimer() {
@@ -224,17 +231,37 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
         : DateTime.now();
   }
 
+  int get _rangeLimit {
+    switch (_selectedRange) {
+      case AnalyticsRange.day24:
+        return 800;
+      case AnalyticsRange.day7:
+        return 2500;
+      case AnalyticsRange.day30:
+      case AnalyticsRange.custom:
+        return 6000;
+    }
+  }
+
+  Query<Map<String, dynamic>> _readingsQuery(String deviceId) {
+    return FirebaseFirestore.instance
+        .collection('devices')
+        .doc(deviceId)
+        .collection('readings')
+        .where('ts', isGreaterThanOrEqualTo: Timestamp.fromDate(_rangeStart))
+        .orderBy('ts', descending: true)
+        .limit(_rangeLimit);
+  }
+
   Future<void> _pickCustomRange() async {
     final now = DateTime.now();
     final picked = await showDateRangePicker(
       context: context,
       firstDate: DateTime(now.year - 2),
       lastDate: DateTime(now.year + 1),
-      initialDateRange: _customRange ??
-          DateTimeRange(
-            start: now.subtract(const Duration(days: 7)),
-            end: now,
-          ),
+      initialDateRange:
+          _customRange ??
+          DateTimeRange(start: now.subtract(const Duration(days: 7)), end: now),
     );
 
     if (picked != null) {
@@ -251,7 +278,9 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
     required _MetricSummary ph,
     required _MetricSummary tds,
     required _MetricSummary temp,
-    required _MetricSummary waterLevel,
+    required _MetricSummary phUpTank,
+    required _MetricSummary phDownTank,
+    required _MetricSummary nutrientTank,
   }) async {
     final pdf = pw.Document();
     final rangeText =
@@ -263,10 +292,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
         build: (_) => [
           pw.Text(
             'Smart Aquaponics Analytics Report',
-            style: pw.TextStyle(
-              fontSize: 22,
-              fontWeight: pw.FontWeight.bold,
-            ),
+            style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
           ),
           pw.SizedBox(height: 8),
           pw.Text('Device ID: $deviceId'),
@@ -275,10 +301,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
           pw.SizedBox(height: 18),
           pw.Text(
             'Metric Summary',
-            style: pw.TextStyle(
-              fontSize: 16,
-              fontWeight: pw.FontWeight.bold,
-            ),
+            style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
           ),
           pw.SizedBox(height: 8),
           pw.TableHelper.fromTextArray(
@@ -291,24 +314,35 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                 temp.latestText,
                 temp.minText,
                 temp.avgText,
-                temp.maxText
+                temp.maxText,
               ],
               [
-                'Water Level',
-                waterLevel.latestText,
-                waterLevel.minText,
-                waterLevel.avgText,
-                waterLevel.maxText
+                'pH Up Tank',
+                phUpTank.latestText,
+                phUpTank.minText,
+                phUpTank.avgText,
+                phUpTank.maxText,
+              ],
+              [
+                'pH Down Tank',
+                phDownTank.latestText,
+                phDownTank.minText,
+                phDownTank.avgText,
+                phDownTank.maxText,
+              ],
+              [
+                'Nutrient Tank',
+                nutrientTank.latestText,
+                nutrientTank.minText,
+                nutrientTank.avgText,
+                nutrientTank.maxText,
               ],
             ],
           ),
           pw.SizedBox(height: 18),
           pw.Text(
             'System Insights',
-            style: pw.TextStyle(
-              fontSize: 16,
-              fontWeight: pw.FontWeight.bold,
-            ),
+            style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
           ),
           pw.SizedBox(height: 8),
           pw.Bullet(text: 'Total telemetry records analysed: ${points.length}'),
@@ -323,9 +357,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
       ),
     );
 
-    await Printing.layoutPdf(
-      onLayout: (format) async => pdf.save(),
-    );
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
   }
 
   Future<void> _sharePdf({
@@ -334,7 +366,9 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
     required _MetricSummary ph,
     required _MetricSummary tds,
     required _MetricSummary temp,
-    required _MetricSummary waterLevel,
+    required _MetricSummary phUpTank,
+    required _MetricSummary phDownTank,
+    required _MetricSummary nutrientTank,
   }) async {
     final pdf = pw.Document();
     final rangeText =
@@ -346,10 +380,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
         build: (_) => [
           pw.Text(
             'Smart Aquaponics Analytics Report',
-            style: pw.TextStyle(
-              fontSize: 22,
-              fontWeight: pw.FontWeight.bold,
-            ),
+            style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
           ),
           pw.SizedBox(height: 8),
           pw.Text('Device ID: $deviceId'),
@@ -366,14 +397,28 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                 temp.latestText,
                 temp.minText,
                 temp.avgText,
-                temp.maxText
+                temp.maxText,
               ],
               [
-                'Water Level',
-                waterLevel.latestText,
-                waterLevel.minText,
-                waterLevel.avgText,
-                waterLevel.maxText
+                'pH Up Tank',
+                phUpTank.latestText,
+                phUpTank.minText,
+                phUpTank.avgText,
+                phUpTank.maxText,
+              ],
+              [
+                'pH Down Tank',
+                phDownTank.latestText,
+                phDownTank.minText,
+                phDownTank.avgText,
+                phDownTank.maxText,
+              ],
+              [
+                'Nutrient Tank',
+                nutrientTank.latestText,
+                nutrientTank.minText,
+                nutrientTank.avgText,
+                nutrientTank.maxText,
               ],
             ],
           ),
@@ -382,15 +427,17 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
     );
 
     final bytes = await pdf.save();
-    await Share.shareXFiles(
-      [
-        XFile.fromData(
-          bytes,
-          mimeType: 'application/pdf',
-          name: 'analytics_report.pdf',
-        ),
-      ],
-      text: 'Smart Aquaponics Analytics Report',
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [
+          XFile.fromData(
+            bytes,
+            mimeType: 'application/pdf',
+            name: 'analytics_report.pdf',
+          ),
+        ],
+        text: 'Smart Aquaponics Analytics Report',
+      ),
     );
   }
 
@@ -410,10 +457,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
           children: [
             Text(
               'Active Alerts (${_activeAlertMetrics.length})',
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 16,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
             ),
             const SizedBox(height: 4),
             Text(
@@ -455,10 +499,10 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
         border: Border.all(color: Colors.grey.shade200),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 12,
             offset: const Offset(0, 4),
-          )
+          ),
         ],
       ),
       child: Row(
@@ -480,7 +524,10 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
           if (range == AnalyticsRange.custom) {
             await _pickCustomRange();
           } else {
-            setState(() => _selectedRange = range);
+            setState(() {
+              _selectedRange = range;
+              _customRange = null;
+            });
           }
         },
         child: AnimatedContainer(
@@ -504,35 +551,61 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
     );
   }
 
+  Widget _analyticsErrorCard(String message) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.red.shade100),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.error_outline, color: Colors.red.shade700),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Telemetry history could not load',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(message, style: TextStyle(color: Colors.grey.shade800)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _sectionTitle(String title, {String? subtitle}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style: const TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-          ),
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
         ),
         if (subtitle != null) ...[
           const SizedBox(height: 4),
           Text(
             subtitle,
-            style: TextStyle(
-              color: Colors.grey.shade700,
-              fontSize: 13.5,
-            ),
+            style: TextStyle(color: Colors.grey.shade700, fontSize: 13.5),
           ),
-        ]
+        ],
       ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final providerDeviceId =
-        context.watch<DeviceSelectionController>().selectedDeviceId;
+    final providerDeviceId = context
+        .watch<DeviceSelectionController>()
+        .selectedDeviceId;
     final deviceId = widget.selectedDeviceId ?? providerDeviceId;
 
     if (!_isFlutterTest && deviceId != _boundDeviceId) {
@@ -542,8 +615,9 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
       });
     }
 
-    final alertCutoff =
-        Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 3)));
+    final alertCutoff = Timestamp.fromDate(
+      DateTime.now().subtract(const Duration(days: 3)),
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6F8),
@@ -596,50 +670,81 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
               ),
             )
           : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              key: ValueKey<String>(
+                'analytics-$deviceId-${_selectedRange.name}-${_rangeStart.millisecondsSinceEpoch}-${_rangeEnd.millisecondsSinceEpoch}',
+              ),
               stream: _isFlutterTest
                   ? null
-                  : FirebaseFirestore.instance
-                      .collection('devices')
-                      .doc(deviceId)
-                      .collection('telemetry')
-                      .where(
-                        'ts',
-                        isGreaterThanOrEqualTo:
-                            Timestamp.fromDate(_rangeStart),
-                      )
-                      .orderBy('ts')
-                      .snapshots(),
+                  : _readingsQuery(deviceId).snapshots(),
               builder: (context, snap) {
+                if (snap.hasError) {
+                  return ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      _sectionTitle('Overview'),
+                      const SizedBox(height: 14),
+                      _rangeSelector(),
+                      const SizedBox(height: 16),
+                      _analyticsErrorCard(snap.error.toString()),
+                    ],
+                  );
+                }
+
                 final docs = snap.data?.docs ?? const [];
-                final telemetry = docs
-                    .map((d) => _TelemetryPoint.fromMap(d.data()))
-                    .where((e) => e.timestamp != null)
-                    .toList();
+                final telemetry =
+                    docs
+                        .map((d) => _TelemetryPoint.fromMap(d.data()))
+                        .where((e) => e.timestamp != null)
+                        .where(
+                          (e) =>
+                              !e.timestamp!.isBefore(_rangeStart) &&
+                              !e.timestamp!.isAfter(_rangeEnd),
+                        )
+                        .toList()
+                      ..sort((a, b) => a.timestamp!.compareTo(b.timestamp!));
+
+                final visibleTelemetry = telemetry.isNotEmpty
+                    ? telemetry
+                    : <_TelemetryPoint>[];
 
                 final phSummary = _MetricSummary.fromTelemetry(
-                  telemetry,
+                  visibleTelemetry,
                   selector: (e) => e.ph,
                   unit: 'pH',
                   decimals: 1,
                 );
 
                 final tdsSummary = _MetricSummary.fromTelemetry(
-                  telemetry,
+                  visibleTelemetry,
                   selector: (e) => e.tds,
                   unit: 'ppm',
                   decimals: 0,
                 );
 
                 final tempSummary = _MetricSummary.fromTelemetry(
-                  telemetry,
+                  visibleTelemetry,
                   selector: (e) => e.temperature,
                   unit: '°C',
                   decimals: 1,
                 );
 
-                final waterLevelSummary = _MetricSummary.fromTelemetry(
-                  telemetry,
-                  selector: (e) => e.waterLevel,
+                final phUpTankSummary = _MetricSummary.fromTelemetry(
+                  visibleTelemetry,
+                  selector: (e) => e.phUpTankLevelPct,
+                  unit: '%',
+                  decimals: 0,
+                );
+
+                final phDownTankSummary = _MetricSummary.fromTelemetry(
+                  visibleTelemetry,
+                  selector: (e) => e.phDownTankLevelPct,
+                  unit: '%',
+                  decimals: 0,
+                );
+
+                final nutrientTankSummary = _MetricSummary.fromTelemetry(
+                  visibleTelemetry,
+                  selector: (e) => e.nutrientTankLevelPct,
                   unit: '%',
                   decimals: 0,
                 );
@@ -650,7 +755,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                     _sectionTitle(
                       'Overview',
                       subtitle:
-                          'Monitor pH, TDS, temperature and water level in one place.',
+                          'Monitor pH, TDS, temperature and dosing tank levels in one place.',
                     ),
                     const SizedBox(height: 14),
                     _rangeSelector(),
@@ -666,10 +771,10 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                           borderRadius: BorderRadius.circular(22),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
+                              color: Colors.black.withValues(alpha: 0.03),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
-                            )
+                            ),
                           ],
                         ),
                         child: const ListTile(
@@ -736,36 +841,68 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                       ),
                       const SizedBox(height: 16),
                       _AnalyticsMetricCard(
-                        title: 'Water Level',
-                        currentValue: waterLevelSummary.latestText,
-                        trendText: waterLevelSummary.trendPercentText,
-                        trendUp: waterLevelSummary.trendUp,
-                        lineColor: const Color(0xFF29B6F6),
-                        fillColor: const Color(0xFFD8F2FF),
-                        points: waterLevelSummary.chartPoints,
-                        labels: waterLevelSummary.labels,
-                        minText: waterLevelSummary.minText,
-                        avgText: waterLevelSummary.avgText,
-                        maxText: waterLevelSummary.maxText,
+                        title: 'pH Up Tank',
+                        currentValue: phUpTankSummary.latestText,
+                        trendText: phUpTankSummary.trendPercentText,
+                        trendUp: phUpTankSummary.trendUp,
+                        lineColor: const Color(0xFF7CB342),
+                        fillColor: const Color(0xFFE7F3D9),
+                        points: phUpTankSummary.chartPoints,
+                        labels: phUpTankSummary.labels,
+                        minText: phUpTankSummary.minText,
+                        avgText: phUpTankSummary.avgText,
+                        maxText: phUpTankSummary.maxText,
+                      ),
+                      const SizedBox(height: 16),
+                      _AnalyticsMetricCard(
+                        title: 'pH Down Tank',
+                        currentValue: phDownTankSummary.latestText,
+                        trendText: phDownTankSummary.trendPercentText,
+                        trendUp: phDownTankSummary.trendUp,
+                        lineColor: const Color(0xFF8E24AA),
+                        fillColor: const Color(0xFFF1DDF8),
+                        points: phDownTankSummary.chartPoints,
+                        labels: phDownTankSummary.labels,
+                        minText: phDownTankSummary.minText,
+                        avgText: phDownTankSummary.avgText,
+                        maxText: phDownTankSummary.maxText,
+                      ),
+                      const SizedBox(height: 16),
+                      _AnalyticsMetricCard(
+                        title: 'Nutrient Tank',
+                        currentValue: nutrientTankSummary.latestText,
+                        trendText: nutrientTankSummary.trendPercentText,
+                        trendUp: nutrientTankSummary.trendUp,
+                        lineColor: const Color(0xFF2E7D32),
+                        fillColor: const Color(0xFFDFF3E3),
+                        points: nutrientTankSummary.chartPoints,
+                        labels: nutrientTankSummary.labels,
+                        minText: nutrientTankSummary.minText,
+                        avgText: nutrientTankSummary.avgText,
+                        maxText: nutrientTankSummary.maxText,
                       ),
                       const SizedBox(height: 20),
 
                       _ComparisonCard(
                         onExport: () => _exportPdf(
                           deviceId: deviceId,
-                          points: telemetry,
+                          points: visibleTelemetry,
                           ph: phSummary,
                           tds: tdsSummary,
                           temp: tempSummary,
-                          waterLevel: waterLevelSummary,
+                          phUpTank: phUpTankSummary,
+                          phDownTank: phDownTankSummary,
+                          nutrientTank: nutrientTankSummary,
                         ),
                         onShare: () => _sharePdf(
                           deviceId: deviceId,
-                          points: telemetry,
+                          points: visibleTelemetry,
                           ph: phSummary,
                           tds: tdsSummary,
                           temp: tempSummary,
-                          waterLevel: waterLevelSummary,
+                          phUpTank: phUpTankSummary,
+                          phDownTank: phDownTankSummary,
+                          nutrientTank: nutrientTankSummary,
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -780,10 +917,10 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                           borderRadius: BorderRadius.circular(22),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
+                              color: Colors.black.withValues(alpha: 0.03),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
-                            )
+                            ),
                           ],
                         ),
                         child: Padding(
@@ -802,15 +939,22 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                               if (_isFlutterTest)
                                 const Padding(
                                   padding: EdgeInsets.symmetric(vertical: 8),
-                                  child: Text('No alert events in the last 3 days.'),
+                                  child: Text(
+                                    'No alert events in the last 3 days.',
+                                  ),
                                 )
                               else
-                                StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                                StreamBuilder<
+                                  QuerySnapshot<Map<String, dynamic>>
+                                >(
                                   stream: FirebaseFirestore.instance
                                       .collection('devices')
                                       .doc(deviceId)
                                       .collection('alerts')
-                                      .where('createdAt', isGreaterThan: alertCutoff)
+                                      .where(
+                                        'createdAt',
+                                        isGreaterThan: alertCutoff,
+                                      )
                                       .orderBy('createdAt', descending: true)
                                       .limit(30)
                                       .snapshots(),
@@ -819,7 +963,9 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                                             ConnectionState.waiting &&
                                         !alertSnap.hasData) {
                                       return const Padding(
-                                        padding: EdgeInsets.symmetric(vertical: 20),
+                                        padding: EdgeInsets.symmetric(
+                                          vertical: 20,
+                                        ),
                                         child: Center(
                                           child: CircularProgressIndicator(),
                                         ),
@@ -844,14 +990,16 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                                       itemBuilder: (context, i) {
                                         final data = alertDocs[i].data();
                                         final ts = data['createdAt'];
-                                        final dateTime =
-                                            ts is Timestamp ? ts.toDate() : null;
+                                        final dateTime = ts is Timestamp
+                                            ? ts.toDate()
+                                            : null;
                                         final eventType =
-                                            (data['eventType'] ?? '').toString();
-                                        final metric =
-                                            (data['metric'] ?? '').toString();
-                                        final message =
-                                            (data['message'] ?? '').toString();
+                                            (data['eventType'] ?? '')
+                                                .toString();
+                                        final metric = (data['metric'] ?? '')
+                                            .toString();
+                                        final message = (data['message'] ?? '')
+                                            .toString();
 
                                         return ListTile(
                                           contentPadding: EdgeInsets.zero,
@@ -890,7 +1038,6 @@ class _TelemetryPoint {
   final double? ph;
   final double? tds;
   final double? temperature;
-  final double? waterLevel;
   final double? phUpTankLevelPct;
   final double? phDownTankLevelPct;
   final double? nutrientTankLevelPct;
@@ -903,7 +1050,6 @@ class _TelemetryPoint {
     required this.ph,
     required this.tds,
     required this.temperature,
-    required this.waterLevel,
     required this.phUpTankLevelPct,
     required this.phDownTankLevelPct,
     required this.nutrientTankLevelPct,
@@ -913,22 +1059,47 @@ class _TelemetryPoint {
   });
 
   factory _TelemetryPoint.fromMap(Map<String, dynamic> map) {
-    DateTime? ts;
-    final rawTs = map['ts'];
-    if (rawTs is Timestamp) ts = rawTs.toDate();
+    DateTime? readTimestamp(dynamic value) {
+      if (value is Timestamp) return value.toDate();
+      if (value is DateTime) return value;
+      if (value is num) {
+        final ms = value.toInt();
+        if (ms > 1000000000) {
+          return DateTime.fromMillisecondsSinceEpoch(ms);
+        }
+      }
+      if (value is String) {
+        final asInt = int.tryParse(value);
+        if (asInt != null && asInt > 1000000000) {
+          return DateTime.fromMillisecondsSinceEpoch(asInt);
+        }
+        return DateTime.tryParse(value);
+      }
+      return null;
+    }
+
+    final ts =
+        readTimestamp(map['ts']) ??
+        readTimestamp(map['createdAt']) ??
+        readTimestamp(map['lastSeen']) ??
+        readTimestamp(map['tsEpochMs']) ??
+        readTimestamp(map['tsMs']);
+    final sampleCount = (map['sampleCount'] as num?)?.toInt();
+    final rawTemperature = (map['temperatureC'] as num?)?.toDouble();
 
     return _TelemetryPoint(
       timestamp: ts,
       ph: (map['ph'] as num?)?.toDouble(),
       tds: (map['tdsPpm'] as num?)?.toDouble(),
-      temperature: (map['temperatureC'] as num?)?.toDouble(),
-      waterLevel: (map['waterLevelPct'] as num?)?.toDouble(),
+      temperature:
+          rawTemperature ??
+          _simulatedWaterTemperatureC(timestamp: ts, sampleCount: sampleCount),
       phUpTankLevelPct: (map['phUpTankLevelPct'] as num?)?.toDouble(),
       phDownTankLevelPct: (map['phDownTankLevelPct'] as num?)?.toDouble(),
       nutrientTankLevelPct: (map['nutrientTankLevelPct'] as num?)?.toDouble(),
       sensorStatus: map['sensorStatus']?.toString(),
       lastReadOk: map['lastReadOk'] as bool?,
-      sampleCount: (map['sampleCount'] as num?)?.toInt(),
+      sampleCount: sampleCount,
     );
   }
 }
@@ -1063,10 +1234,10 @@ class _AnalyticsMetricCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 12,
             offset: const Offset(0, 4),
-          )
+          ),
         ],
       ),
       child: Padding(
@@ -1086,12 +1257,12 @@ class _AnalyticsMetricCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
-                    color: trendUp
-                        ? Colors.green.shade50
-                        : Colors.red.shade50,
+                    color: trendUp ? Colors.green.shade50 : Colors.red.shade50,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -1101,16 +1272,13 @@ class _AnalyticsMetricCard extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                )
+                ),
               ],
             ),
             const SizedBox(height: 6),
             Text(
               currentValue,
-              style: const TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w500,
-              ),
+              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 16),
             SizedBox(
@@ -1125,9 +1293,27 @@ class _AnalyticsMetricCard extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _MetricInfo(label: 'Min', value: minText, color: Colors.lightBlue)),
-                Expanded(child: _MetricInfo(label: 'Avg', value: avgText, color: Colors.grey)),
-                Expanded(child: _MetricInfo(label: 'Max', value: maxText, color: Colors.orange)),
+                Expanded(
+                  child: _MetricInfo(
+                    label: 'Min',
+                    value: minText,
+                    color: Colors.lightBlue,
+                  ),
+                ),
+                Expanded(
+                  child: _MetricInfo(
+                    label: 'Avg',
+                    value: avgText,
+                    color: Colors.grey,
+                  ),
+                ),
+                Expanded(
+                  child: _MetricInfo(
+                    label: 'Max',
+                    value: maxText,
+                    color: Colors.orange,
+                  ),
+                ),
               ],
             ),
           ],
@@ -1154,10 +1340,7 @@ class _MetricInfo extends StatelessWidget {
       children: [
         Text(
           label,
-          style: TextStyle(
-            color: Colors.grey.shade700,
-            fontSize: 14,
-          ),
+          style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
         ),
         const SizedBox(height: 6),
         Text(
@@ -1216,10 +1399,7 @@ class _MiniLineChart extends StatelessWidget {
                   child: Text(
                     e,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 11,
-                    ),
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -1259,7 +1439,7 @@ class _LineChartPainter extends CustomPainter {
     final range = (maxVal - minVal).abs() < 0.0001 ? 1.0 : (maxVal - minVal);
 
     final gridPaint = Paint()
-      ..color = Colors.grey.withOpacity(0.15)
+      ..color = Colors.grey.withValues(alpha: 0.15)
       ..strokeWidth = 1;
 
     for (int i = 0; i < 4; i++) {
@@ -1280,8 +1460,11 @@ class _LineChartPainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     Offset pointOffset(int index) {
-      final x = leftPadding +
-          (points.length == 1 ? chartWidth / 2 : (chartWidth * index / (points.length - 1)));
+      final x =
+          leftPadding +
+          (points.length == 1
+              ? chartWidth / 2
+              : (chartWidth * index / (points.length - 1)));
       final normalized = (points[index] - minVal) / range;
       final y = topPadding + chartHeight - (normalized * chartHeight);
       return Offset(x, y);
@@ -1326,10 +1509,7 @@ class _LineChartPainter extends CustomPainter {
 }
 
 class _ComparisonCard extends StatelessWidget {
-  const _ComparisonCard({
-    required this.onExport,
-    required this.onShare,
-  });
+  const _ComparisonCard({required this.onExport, required this.onShare});
 
   final VoidCallback onExport;
   final VoidCallback onShare;
@@ -1342,10 +1522,10 @@ class _ComparisonCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 12,
             offset: const Offset(0, 4),
-          )
+          ),
         ],
       ),
       child: Padding(
@@ -1358,10 +1538,7 @@ class _ComparisonCard extends StatelessWidget {
                 const Expanded(
                   child: Text(
                     'System Performance',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                   ),
                 ),
                 IconButton(
@@ -1391,10 +1568,7 @@ class _ComparisonCard extends StatelessWidget {
             const SizedBox(height: 24),
             const Text(
               'Overall Performance',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 14),
             _progressItem('Smart System', 0.854, Colors.green),
@@ -1420,11 +1594,13 @@ class _ComparisonCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                  )),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
+              ),
               const SizedBox(height: 4),
               RichText(
                 text: TextSpan(
@@ -1457,7 +1633,7 @@ class _ComparisonCard extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
-        )
+        ),
       ],
     );
   }
@@ -1513,10 +1689,10 @@ class _GrowthTrackingCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 12,
             offset: const Offset(0, 4),
-          )
+          ),
         ],
       ),
       child: Padding(
@@ -1547,8 +1723,10 @@ class _GrowthTrackingCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.green.shade50,
                     borderRadius: BorderRadius.circular(12),
@@ -1560,7 +1738,7 @@ class _GrowthTrackingCard extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                )
+                ),
               ],
             ),
             const SizedBox(height: 22),
@@ -1591,7 +1769,7 @@ class _GrowthTrackingCard extends StatelessWidget {
                   ),
                 ),
               ],
-            )
+            ),
           ],
         ),
       ),
@@ -1629,16 +1807,10 @@ class _StageItem extends StatelessWidget {
         Text(
           title,
           textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 16,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
         ),
         const SizedBox(height: 4),
-        Text(
-          day,
-          style: const TextStyle(color: Colors.black54),
-        ),
+        Text(day, style: const TextStyle(color: Colors.black54)),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1653,7 +1825,7 @@ class _StageItem extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
-        )
+        ),
       ],
     );
   }
@@ -1681,10 +1853,7 @@ class _HarvestPredictionCard extends StatelessWidget {
                 SizedBox(width: 10),
                 Text(
                   'Harvest Prediction',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                 ),
               ],
             ),
@@ -1724,7 +1893,7 @@ class _HarvestPredictionCard extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-            )
+            ),
           ],
         ),
       ),
@@ -1733,10 +1902,7 @@ class _HarvestPredictionCard extends StatelessWidget {
 }
 
 class _PredictionItem extends StatelessWidget {
-  const _PredictionItem({
-    required this.label,
-    required this.value,
-  });
+  const _PredictionItem({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -1748,10 +1914,7 @@ class _PredictionItem extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            color: Colors.black54,
-            fontSize: 14,
-          ),
+          style: const TextStyle(color: Colors.black54, fontSize: 14),
         ),
         const SizedBox(height: 6),
         Text(
